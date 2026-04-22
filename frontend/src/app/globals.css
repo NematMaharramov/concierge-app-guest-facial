@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --gold: #c9a96e;
+  --charcoal: #1a1a1a;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #fafaf8;
+  color: #1a1a1a;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display { font-family: 'Cormorant Garamond', Georgia, serif; }
+
+@layer components {
+  .btn-primary {
+    @apply bg-charcoal-900 text-white px-6 py-2.5 text-sm tracking-widest uppercase hover:bg-charcoal-700 transition-colors duration-200 font-medium;
+  }
+  .btn-ghost {
+    @apply border border-charcoal-900 text-charcoal-900 px-6 py-2.5 text-sm tracking-widest uppercase hover:bg-charcoal-900 hover:text-white transition-colors duration-200 font-medium;
+  }
+  .btn-gold {
+    @apply bg-gold-500 text-white px-6 py-2.5 text-sm tracking-widest uppercase hover:bg-gold-600 transition-colors duration-200 font-medium;
+  }
+  .input-field {
+    @apply w-full border border-charcoal-200 px-4 py-2.5 text-sm focus:outline-none focus:border-charcoal-900 transition-colors bg-white;
+  }
+  .card {
+    @apply bg-white border border-charcoal-100 hover:border-charcoal-200 transition-all duration-300;
+  }
+  .section-title {
+    @apply font-display text-3xl md:text-4xl font-light text-charcoal-900 tracking-wide;
+  }
+  .label {
+    @apply block text-xs font-medium tracking-widest uppercase text-charcoal-500 mb-1.5;
+  }
+  .gold-divider {
+    @apply w-12 h-px bg-gold-500 mx-auto;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #c9a96e; border-radius: 3px; }
