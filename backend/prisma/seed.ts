@@ -303,5 +303,8 @@ async function main() {
 }
 
 main()
-  .catch(console.error)
+  .catch((e) => {
+    console.error('Seed error (non-fatal):', e.message);
+    process.exit(0);
+  })
   .finally(() => prisma.$disconnect());
