@@ -2,129 +2,204 @@
 import { useEffect, useState } from 'react';
 import { getCategories, getSettings } from '@/lib/api';
 import Link from 'next/link';
-import Image from 'next/image';
 
 const CATEGORY_BG: Record<string, string> = {
-  'taxi-transfers': 'https://images.unsplash.com/photo-1549294413-26f195200c16?w=800&q=80',
-  'boat-excursions': 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&q=80',
-  'catamaran': 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80',
-  'car-rental': 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=800&q=80',
-  'golf': 'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800&q=80',
-  'helicopter': 'https://images.unsplash.com/photo-1534430480872-3498386e7856?w=800&q=80',
+  'taxi-transfers': 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=900&q=90',
+  'boat-excursions': 'https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?w=900&q=90',
+  'catamaran': 'https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=900&q=90',
+  'car-rental': 'https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?w=900&q=90',
+  'golf': 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=900&q=90',
+  'helicopter': 'https://images.unsplash.com/photo-1540962351504-03099e0a754b?w=900&q=90',
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  'taxi-transfers': 'Island Transfers',
+  'boat-excursions': 'Ocean Escapes',
+  'catamaran': 'Private Charters',
+  'car-rental': 'Self Discovery',
+  'golf': 'Golf & Leisure',
+  'helicopter': 'Aerial Journeys',
 };
 
 export default function HomePage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     Promise.all([getCategories(), getSettings()])
       .then(([cats, sets]) => { setCategories(cats); setSettings(sets); })
       .finally(() => setLoading(false));
+
+    const onScroll = () => setScrolled(window.scrollY > 60);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#fafaf8]">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-charcoal-100">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen" style={{ background: '#f2ede6' }}>
+
+      {/* Navigation — no staff login shown */}
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'bg-white/98 shadow-sm backdrop-blur-sm' : 'bg-transparent'}`}>
+        <div className="max-w-7xl mx-auto px-8 py-5 flex items-center justify-between">
           <div>
-            <p className="font-display text-xl font-light tracking-[0.15em] text-charcoal-900">RAFFLES PRASLIN</p>
-            <p className="text-[10px] tracking-[0.3em] uppercase text-gold-500 font-medium">Concierge Services</p>
+            <p className={`font-display text-lg tracking-[0.22em] font-light transition-colors duration-300 ${scrolled ? 'text-[#1a1a1a]' : 'text-white'}`}>
+              RAFFLES PRASLIN
+            </p>
+            <p className={`text-[9px] tracking-[0.45em] uppercase font-medium transition-colors duration-300 ${scrolled ? 'text-[#c9a96e]' : 'text-[#e8d5a3]'}`}>
+              Seychelles
+            </p>
           </div>
-          <div className="flex items-center gap-6">
-            <a href="#services" className="text-xs tracking-widest uppercase text-charcoal-600 hover:text-charcoal-900 transition-colors">Services</a>
-            <Link href="/login" className="text-xs tracking-widest uppercase text-charcoal-600 hover:text-charcoal-900 transition-colors">Staff Login</Link>
-          </div>
+          <a
+            href="#services"
+            className={`text-[10px] tracking-[0.35em] uppercase transition-colors duration-300 ${scrolled ? 'text-[#1a1a1a] hover:text-[#c9a96e]' : 'text-white/80 hover:text-white'}`}
+          >
+            Our Services
+          </a>
         </div>
       </nav>
 
       {/* Hero */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-charcoal-950">
-          {settings.hero_image ? (
-            <img src={settings.hero_image} alt="Hero" className="w-full h-full object-cover opacity-50" />
-          ) : (
-            <img
-              src="https://images.unsplash.com/photo-1590523741831-ab7e8b8f9c7f?w=1920&q=85"
-              alt="Seychelles"
-              className="w-full h-full object-cover opacity-45"
-            />
-          )}
+        <div className="absolute inset-0">
+          <img
+            src={settings.hero_image || 'https://images.unsplash.com/photo-1573843981267-be1999ff37cd?w=1920&q=90'}
+            alt="Raffles Praslin"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(10,8,5,0.28) 0%, rgba(10,8,5,0.10) 45%, rgba(10,8,5,0.48) 100%)' }} />
         </div>
         <div className="relative text-center text-white px-6 animate-fade-in">
-          <p className="text-xs tracking-[0.5em] uppercase text-gold-400 mb-6 font-medium">Welcome to</p>
-          <h1 className="font-display text-5xl md:text-7xl font-light tracking-wide mb-4">
+          <p className="text-[10px] tracking-[0.65em] uppercase mb-8 font-light" style={{ color: '#e8d5a3', letterSpacing: '0.55em' }}>
+            Concierge Services
+          </p>
+          <h1 className="font-display font-light mb-7" style={{ fontSize: 'clamp(3rem, 7.5vw, 6rem)', lineHeight: 1.05, letterSpacing: '0.06em' }}>
             {settings.site_title || 'Raffles Praslin'}
           </h1>
-          <div className="gold-divider mb-6" />
-          <p className="text-lg md:text-xl font-light tracking-wide text-white/80 max-w-xl mx-auto">
-            {settings.site_subtitle || 'Curated experiences for every moment in Seychelles'}
+          <div className="flex items-center justify-center gap-5 mb-8">
+            <div style={{ height: '1px', width: '50px', background: 'linear-gradient(to right, transparent, #c9a96e)' }} />
+            <div style={{ width: '5px', height: '5px', background: '#c9a96e', transform: 'rotate(45deg)', flexShrink: 0 }} />
+            <div style={{ height: '1px', width: '50px', background: 'linear-gradient(to left, transparent, #c9a96e)' }} />
+          </div>
+          <p className="font-light tracking-wider text-white/70" style={{ fontSize: '1.05rem', maxWidth: '460px', margin: '0 auto 3.5rem', lineHeight: 1.9 }}>
+            {settings.site_subtitle || 'Every experience, thoughtfully arranged for you'}
           </p>
-          <a href="#services" className="mt-10 inline-block border border-white/60 text-white px-10 py-3 text-xs tracking-[0.3em] uppercase hover:bg-white hover:text-charcoal-900 transition-all duration-300">
-            Explore Services
+          <a
+            href="#services"
+            className="inline-block text-[10px] tracking-[0.45em] uppercase transition-all duration-400 hover:bg-white hover:text-[#1a1a1a]"
+            style={{ border: '1px solid rgba(255,255,255,0.5)', color: 'white', padding: '15px 50px', letterSpacing: '0.4em' }}
+          >
+            Discover
           </a>
         </div>
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-          <svg className="w-5 h-5 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
-          </svg>
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+          <p className="text-white/30 text-[9px] tracking-[0.5em] uppercase">Scroll</p>
+          <div className="w-px h-14 bg-gradient-to-b from-white/30 to-transparent" />
         </div>
       </section>
 
-      {/* Intro */}
-      <section className="py-20 px-6 text-center bg-white">
-        <p className="text-xs tracking-[0.4em] uppercase text-gold-500 mb-4 font-medium">Our Services</p>
-        <h2 className="font-display text-4xl font-light text-charcoal-900 mb-4">Extraordinary Experiences</h2>
-        <div className="gold-divider mb-6" />
-        <p className="text-charcoal-500 max-w-xl mx-auto text-sm leading-relaxed">
-          From private island excursions to seamless helicopter transfers, our concierge team curates every detail of your Seychelles stay.
+      {/* Intro band */}
+      <section className="py-28 px-6 text-center bg-white">
+        <p className="text-[10px] tracking-[0.55em] uppercase mb-6 font-medium" style={{ color: '#c9a96e' }}>Curated For You</p>
+        <h2 className="font-display font-light mb-7" style={{ fontSize: 'clamp(2.1rem, 4vw, 3rem)', color: '#1a1a1a', letterSpacing: '0.04em' }}>
+          Extraordinary Experiences
+        </h2>
+        <div className="flex items-center justify-center gap-5 mb-9">
+          <div style={{ height: '1px', width: '40px', background: 'linear-gradient(to right, transparent, #c9a96e)' }} />
+          <div style={{ width: '4px', height: '4px', background: '#c9a96e', transform: 'rotate(45deg)', flexShrink: 0 }} />
+          <div style={{ height: '1px', width: '40px', background: 'linear-gradient(to left, transparent, #c9a96e)' }} />
+        </div>
+        <p className="mx-auto" style={{ color: '#aaa', maxWidth: '520px', lineHeight: 2.1, fontSize: '0.875rem' }}>
+          From private island excursions to seamless helicopter transfers and championship golf,
+          our concierge team curates every detail of your Seychelles stay with quiet precision.
         </p>
       </section>
 
       {/* Services Grid */}
-      <section id="services" className="py-16 px-6 max-w-7xl mx-auto">
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-72 bg-charcoal-100 animate-pulse" />
-            ))}
+      <section id="services" className="py-24 px-6" style={{ background: '#f2ede6' }}>
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-[10px] tracking-[0.55em] uppercase mb-4 font-medium" style={{ color: '#c9a96e' }}>Explore</p>
+            <h2 className="font-display font-light" style={{ fontSize: '2.1rem', color: '#1a1a1a', letterSpacing: '0.04em' }}>Our Services</h2>
           </div>
-        ) : (
-          <div className={`grid gap-6 ${settings.layout_style === 'list' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
-            {categories.map((cat) => (
-              <Link key={cat.id} href={`/services/${cat.slug}`} className="group block overflow-hidden card animate-slide-up">
-                <div className="relative h-52 overflow-hidden bg-charcoal-100">
+
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0.5">
+              {[...Array(6)].map((_, i) => <div key={i} className="h-80 animate-pulse" style={{ background: '#e0d8cc' }} />)}
+            </div>
+          ) : (
+            <div className={`grid gap-0.5 ${settings.layout_style === 'list' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+              {categories.map((cat, idx) => (
+                <Link
+                  key={cat.id}
+                  href={`/services/${cat.slug}`}
+                  className="group relative overflow-hidden block"
+                  style={{ height: idx === 0 ? '420px' : '340px' }}
+                >
                   <img
-                    src={CATEGORY_BG[cat.slug] || 'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=800&q=80'}
+                    src={CATEGORY_BG[cat.slug] || 'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=900&q=90'}
                     alt={cat.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-107"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-charcoal-950/70 via-transparent to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
-                    <p className="text-2xl mb-1">{cat.icon}</p>
-                    <h3 className="font-display text-2xl font-light tracking-wide">{cat.name}</h3>
+                  {/* Dark overlay */}
+                  <div className="absolute inset-0 transition-opacity duration-500" style={{ background: 'linear-gradient(to top, rgba(8,6,3,0.82) 0%, rgba(8,6,3,0.05) 55%, transparent 100%)' }} />
+                  {/* Hover tint */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: 'rgba(8,6,3,0.18)' }} />
+
+                  {/* Gold top border on hover */}
+                  <div className="absolute top-0 left-0 right-0 h-0.5 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500" style={{ background: '#c9a96e' }} />
+
+                  <div className="absolute inset-0 flex flex-col justify-end p-8 pb-9">
+                    <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-400 ease-out">
+                      <p className="text-[9px] tracking-[0.5em] uppercase mb-2.5 font-medium" style={{ color: '#c9a96e' }}>
+                        {CATEGORY_LABEL[cat.slug] || 'Experience'}
+                      </p>
+                      <h3 className="font-display font-light text-white mb-5" style={{ fontSize: '1.6rem', letterSpacing: '0.04em', lineHeight: 1.2 }}>
+                        {cat.name}
+                      </h3>
+                      <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">
+                        <div style={{ height: '1px', width: '22px', background: '#c9a96e' }} />
+                        <span className="text-[9px] tracking-[0.45em] uppercase" style={{ color: '#c9a96e' }}>Explore</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="p-5 flex items-center justify-between">
-                  <p className="text-charcoal-500 text-sm leading-relaxed line-clamp-2">{cat.description}</p>
-                  <svg className="w-5 h-5 text-gold-500 flex-shrink-0 ml-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Concierge strip */}
+      <section className="py-24 px-6 text-center" style={{ background: '#fff' }}>
+        <div className="max-w-2xl mx-auto">
+          <p className="text-[10px] tracking-[0.55em] uppercase mb-5 font-medium" style={{ color: '#c9a96e' }}>Always Available</p>
+          <h2 className="font-display font-light mb-7" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', color: '#1a1a1a', letterSpacing: '0.04em' }}>
+            Your Personal Concierge
+          </h2>
+          <div className="flex items-center justify-center gap-5 mb-8">
+            <div style={{ height: '1px', width: '40px', background: 'linear-gradient(to right, transparent, #c9a96e)' }} />
+            <div style={{ width: '4px', height: '4px', background: '#c9a96e', transform: 'rotate(45deg)', flexShrink: 0 }} />
+            <div style={{ height: '1px', width: '40px', background: 'linear-gradient(to left, transparent, #c9a96e)' }} />
           </div>
-        )}
+          <p style={{ color: '#bbb', lineHeight: 2.1, fontSize: '0.875rem', marginBottom: '2.5rem' }}>
+            Our team is available around the clock to arrange any experience, transfer or activity during your stay at Raffles Praslin.
+          </p>
+          <p className="text-[10px] tracking-[0.5em] uppercase" style={{ color: '#c9a96e', opacity: 0.7 }}>
+            Anse Takamaka · Praslin · Seychelles
+          </p>
+        </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-charcoal-950 text-white/60 py-12 text-center">
-        <p className="font-display text-2xl font-light text-white mb-2 tracking-wide">Raffles Praslin</p>
-        <div className="gold-divider mb-4" />
-        <p className="text-xs tracking-widest uppercase">Anse Takamaka, Praslin, Seychelles</p>
-        <p className="text-xs mt-6 text-white/30">© {new Date().getFullYear()} Raffles Hotels & Resorts. All rights reserved.</p>
+      <footer style={{ background: '#16140f', borderTop: '1px solid rgba(201,169,110,0.12)' }} className="py-10 text-center">
+        <p className="font-display font-light tracking-[0.3em] mb-2" style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8rem' }}>
+          RAFFLES PRASLIN · SEYCHELLES
+        </p>
+        <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.1)', letterSpacing: '0.12em' }}>
+          © {new Date().getFullYear()} Raffles Hotels & Resorts. All rights reserved.
+        </p>
       </footer>
     </div>
   );
