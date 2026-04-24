@@ -1,7 +1,10 @@
 'use client';
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { getCategories, getSettings } from '@/lib/api';
+import { useEffect, useState, useRef } from 'react';
+import { useParams } from 'next/navigation';
+import { getCategoryBySlug, getSettings } from '@/lib/api';
 import Link from 'next/link';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 const CATEGORY_BG: Record<string, string> = {
   'taxi-transfers': 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=1200&q=90',
@@ -12,86 +15,136 @@ const CATEGORY_BG: Record<string, string> = {
   'helicopter': 'https://images.unsplash.com/photo-1540962351504-03099e0a754b?w=1200&q=90',
 };
 
-const CATEGORY_EXTRA_IMAGES: Record<string, string[]> = {
-  'taxi-transfers': [
-    'https://images.unsplash.com/photo-1590556409324-aa1d726e5c3c?w=1200&q=90',
-    'https://images.unsplash.com/photo-1559416523-140ddc3d238c?w=1200&q=90',
-  ],
-  'boat-excursions': [
-    'https://images.unsplash.com/photo-1534190760961-74e8c1c5c3da?w=1200&q=90',
-    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&q=90',
-  ],
-  'catamaran': [
-    'https://images.unsplash.com/photo-1599640842225-85d111c60e6b?w=1200&q=90',
-    'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1200&q=90',
-  ],
-  'car-rental': [
-    'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=1200&q=90',
-    'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?w=1200&q=90',
-  ],
-  'golf': [
-    'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=1200&q=90',
-    'https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=1200&q=90',
-  ],
-  'helicopter': [
-    'https://images.unsplash.com/photo-1608236415053-8c3e0a1cb1e9?w=1200&q=90',
-    'https://images.unsplash.com/photo-1557800634-7d5f1e5e0af4?w=1200&q=90',
-  ],
-};
-
-const CATEGORY_LABEL: Record<string, string> = {
-  'taxi-transfers': 'Island Transfers',
-  'boat-excursions': 'Ocean Escapes',
-  'catamaran': 'Private Charters',
-  'car-rental': 'Self Discovery',
-  'golf': 'Golf & Leisure',
-  'helicopter': 'Aerial Journeys',
-};
-
-// Carousel component for category cards
-function CategoryCarousel({ slug, categoryName }: { slug: string; categoryName: string }) {
-  const images = [CATEGORY_BG[slug] || 'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=1200&q=90', ...(CATEGORY_EXTRA_IMAGES[slug] || [])];
+// Image carousel inside service card / modal
+function ImageSlider({ images, alt, className = '' }: { images: string[]; alt: string; className?: string }) {
   const [current, setCurrent] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setCurrent(c => (c + 1) % images.length);
-    }, 3500 + Math.random() * 1000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [images.length]);
+  if (images.length === 0) return null;
+
+  const prev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrent(c => (c - 1 + images.length) % images.length);
+  };
+  const next = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrent(c => (c + 1) % images.length);
+  };
 
   return (
-    <div className="absolute inset-0">
-      {images.map((src, i) => (
-        <img
-          key={src}
-          src={src}
-          alt={categoryName}
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
-          style={{ opacity: i === current ? 1 : 0 }}
-        />
-      ))}
+    <div className={`relative overflow-hidden ${className}`}>
+      <div
+        className="flex transition-transform duration-500 ease-out h-full"
+        style={{ transform: `translateX(-${current * 100}%)` }}
+      >
+        {images.map((src, i) => (
+          <img
+            key={i}
+            src={src}
+            alt={`${alt} ${i + 1}`}
+            className="w-full h-full object-cover flex-shrink-0"
+            style={{ minWidth: '100%' }}
+          />
+        ))}
+      </div>
+      {images.length > 1 && (
+        <>
+          <button
+            onClick={prev}
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white w-7 h-7 rounded-full flex items-center justify-center transition-colors text-xs"
+          >
+            ‹
+          </button>
+          <button
+            onClick={next}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white w-7 h-7 rounded-full flex items-center justify-center transition-colors text-xs"
+          >
+            ›
+          </button>
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+            {images.map((_, i) => (
+              <button
+                key={i}
+                onClick={e => { e.stopPropagation(); setCurrent(i); }}
+                className="w-1.5 h-1.5 rounded-full transition-colors"
+                style={{ background: i === current ? 'white' : 'rgba(255,255,255,0.4)' }}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-export default function HomePage() {
-  const [categories, setCategories] = useState<any[]>([]);
-  const [settings, setSettings] = useState<any>({});
-  const [loading, setLoading] = useState(true);
-
-  // Header hide/show on scroll
-  const [headerVisible, setHeaderVisible] = useState(false);
-  const [lastScrollY, setLastScrollY] = useState(0);
-  const servicesRef = useRef<HTMLElement>(null);
-  const heroRef = useRef<HTMLElement>(null);
+// Fullscreen image preview
+function FullscreenPreview({ images, startIndex, onClose }: { images: string[]; startIndex: number; onClose: () => void }) {
+  const [current, setCurrent] = useState(startIndex);
 
   useEffect(() => {
-    Promise.all([getCategories(), getSettings()])
-      .then(([cats, sets]) => { setCategories(cats); setSettings(sets); })
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') setCurrent(c => (c - 1 + images.length) % images.length);
+      if (e.key === 'ArrowRight') setCurrent(c => (c + 1) % images.length);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [images.length, onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95"
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white/70 hover:text-white text-2xl w-10 h-10 flex items-center justify-center"
+      >
+        ✕
+      </button>
+      <img
+        src={images[current]}
+        alt=""
+        className="max-w-[90vw] max-h-[85vh] object-contain"
+        onClick={e => e.stopPropagation()}
+      />
+      {images.length > 1 && (
+        <>
+          <button
+            onClick={e => { e.stopPropagation(); setCurrent(c => (c - 1 + images.length) % images.length); }}
+            className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl transition-colors"
+          >
+            ‹
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); setCurrent(c => (c + 1) % images.length); }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl transition-colors"
+          >
+            ›
+          </button>
+          <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/50 text-sm">
+            {current + 1} / {images.length}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function CategoryPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const [category, setCategory] = useState<any>(null);
+  const [settings, setSettings] = useState<any>({});
+  const [loading, setLoading] = useState(true);
+  const [selectedService, setSelectedService] = useState<any>(null);
+  const [fullscreenImages, setFullscreenImages] = useState<string[] | null>(null);
+  const [fullscreenStart, setFullscreenStart] = useState(0);
+
+  useEffect(() => {
+    if (!slug) return;
+    Promise.all([getCategoryBySlug(slug), getSettings()])
+      .then(([cat, sets]) => { setCategory(cat); setSettings(sets); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [slug]);
 
   useEffect(() => {
     if (!settings.primary_color && !settings.accent_color) return;
@@ -100,223 +153,211 @@ export default function HomePage() {
     if (settings.accent_color) root.style.setProperty('--brand-accent', settings.accent_color);
   }, [settings.primary_color, settings.accent_color]);
 
+  // Scroll lock when modal open
   useEffect(() => {
-    const handleScroll = () => {
-      const scrollY = window.scrollY;
-      const servicesTop = servicesRef.current?.offsetTop ?? 9999;
+    if (selectedService) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [selectedService]);
 
-      // Header invisible until leaving hero, reappears when scrolling up
-      // But NOT when in the services section
-      const inServicesSection = scrollY >= servicesTop - 100;
-
-      if (inServicesSection) {
-        setHeaderVisible(false);
-      } else if (scrollY < 80) {
-        setHeaderVisible(false);
-      } else if (scrollY < lastScrollY) {
-        // Scrolling up
-        setHeaderVisible(true);
-      } else {
-        // Scrolling down
-        setHeaderVisible(false);
-      }
-
-      setLastScrollY(scrollY);
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
-
-  const primary = settings.primary_color || '#1a1a1a';
   const accent = settings.accent_color || '#c9a96e';
-  const accentLight = settings.accent_color ? `${settings.accent_color}cc` : '#e8d5a3';
+  const primary = settings.primary_color || '#1a1a1a';
+
+  const getServiceImages = (service: any): string[] => {
+    if (!service?.images?.length) return [];
+    return service.images.map((img: any) => `${API_BASE}${img.url}`);
+  };
+
+  const openFullscreen = (images: string[], idx: number = 0) => {
+    setFullscreenImages(images);
+    setFullscreenStart(idx);
+  };
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#fafaf8]">
+      <div className="text-center">
+        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-4" style={{ borderColor: `${accent} transparent transparent transparent` }} />
+        <p className="text-xs tracking-widest uppercase text-charcoal-400">Loading</p>
+      </div>
+    </div>
+  );
+
+  if (!category) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <p>Category not found</p>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen" style={{ background: '#f2ede6' }}>
-
-      {/* Navigation - hide/show on scroll, not visible in services */}
-      <nav
-        className="fixed top-0 left-0 right-0 z-50 transition-all duration-500"
-        style={{
-          background: 'rgba(255,255,255,0.97)',
-          backdropFilter: 'blur(12px)',
-          boxShadow: '0 1px 20px rgba(0,0,0,0.08)',
-          transform: headerVisible ? 'translateY(0)' : 'translateY(-100%)',
-          pointerEvents: headerVisible ? 'auto' : 'none',
-        }}
-      >
-        <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
-          <div>
-            <p className="font-display text-lg tracking-[0.22em] font-light" style={{ color: primary }}>
-              RAFFLES SEYCHELLES
-            </p>
-            <p className="text-[9px] tracking-[0.45em] uppercase font-medium" style={{ color: accent }}>
-              Praslin
-            </p>
-          </div>
-          <a
-            href="#services"
-            className="text-[10px] tracking-[0.35em] uppercase transition-colors hover:opacity-70"
-            style={{ color: primary }}
-          >
-            Our Services
-          </a>
+    <div className="min-h-screen bg-[#fafaf8]">
+      {/* Nav */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/97 backdrop-blur-sm border-b border-charcoal-100">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
+          <Link href="/" className="font-display text-lg font-light tracking-[0.15em]" style={{ color: primary }}>
+            RAFFLES SEYCHELLES
+          </Link>
+          <span className="text-charcoal-300">/</span>
+          <span className="text-xs tracking-widest uppercase text-charcoal-500">{category.name}</span>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section ref={heroRef} className="relative h-screen flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0">
-          <img
-            src={settings.hero_image || 'https://images.unsplash.com/photo-1573843981267-be1999ff37cd?w=1920&q=90'}
-            alt="Raffles Seychelles"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(10,8,5,0.3) 0%, rgba(10,8,5,0.08) 40%, rgba(10,8,5,0.55) 100%)' }} />
+      {/* Header with category image */}
+      <div className="relative pt-16 h-64 overflow-hidden">
+        <img
+          src={CATEGORY_BG[category.slug] || 'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=1200&q=90'}
+          alt={category.name}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.7))' }} />
+        <div className="relative h-full flex flex-col items-center justify-center text-center px-4">
+          <p className="text-3xl mb-3">{category.icon}</p>
+          <h1 className="font-display text-3xl md:text-4xl font-light text-white mb-2" style={{ letterSpacing: '0.06em' }}>{category.name}</h1>
+          <div className="w-12 h-px mx-auto mb-3" style={{ background: accent }} />
+          <p className="text-white/70 text-sm max-w-xl mx-auto">{category.description}</p>
         </div>
-        <div className="relative text-center text-white px-6 animate-fade-in">
-          <p className="text-[10px] tracking-[0.65em] uppercase mb-8 font-light" style={{ color: accentLight }}>
-            Concierge Services
-          </p>
-          <h1 className="font-display font-light mb-7" style={{ fontSize: 'clamp(3rem, 7.5vw, 6rem)', lineHeight: 1.05, letterSpacing: '0.06em' }}>
-            {settings.site_title || 'Raffles Seychelles'}
-          </h1>
-          <div className="flex items-center justify-center gap-5 mb-8">
-            <div style={{ height: '1px', width: '50px', background: `linear-gradient(to right, transparent, ${accent})` }} />
-            <div style={{ width: '5px', height: '5px', background: accent, transform: 'rotate(45deg)', flexShrink: 0 }} />
-            <div style={{ height: '1px', width: '50px', background: `linear-gradient(to left, transparent, ${accent})` }} />
-          </div>
-          <p className="font-light tracking-wider text-white/70" style={{ fontSize: '1.05rem', maxWidth: '460px', margin: '0 auto 3.5rem', lineHeight: 1.9 }}>
-            {settings.site_subtitle || 'Every experience, thoughtfully arranged for you'}
-          </p>
-          <a
-            href="#services"
-            className="inline-block text-[10px] tracking-[0.45em] uppercase transition-all duration-300 hover:bg-white hover:text-charcoal-900"
-            style={{ border: '1px solid rgba(255,255,255,0.5)', color: 'white', padding: '15px 50px' }}
-          >
-            Discover
-          </a>
-        </div>
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-          <p className="text-white/30 text-[9px] tracking-[0.5em] uppercase">Scroll</p>
-          <div className="w-px h-14 bg-gradient-to-b from-white/30 to-transparent" />
-        </div>
-      </section>
+      </div>
 
-      {/* Intro band */}
-      <section className="py-28 px-6 text-center bg-white">
-        <p className="text-[10px] tracking-[0.55em] uppercase mb-6 font-medium" style={{ color: accent }}>Curated For You</p>
-        <h2 className="font-display font-light mb-7" style={{ fontSize: 'clamp(2.1rem, 4vw, 3rem)', color: primary, letterSpacing: '0.04em' }}>
-          Extraordinary Experiences
-        </h2>
-        <div className="flex items-center justify-center gap-5 mb-9">
-          <div style={{ height: '1px', width: '40px', background: `linear-gradient(to right, transparent, ${accent})` }} />
-          <div style={{ width: '4px', height: '4px', background: accent, transform: 'rotate(45deg)', flexShrink: 0 }} />
-          <div style={{ height: '1px', width: '40px', background: `linear-gradient(to left, transparent, ${accent})` }} />
-        </div>
-        <p className="mx-auto" style={{ color: '#aaa', maxWidth: '520px', lineHeight: 2.1, fontSize: '0.875rem' }}>
-          From private island excursions to seamless helicopter transfers and championship golf,
-          our concierge team curates every detail of your Seychelles stay with quiet precision.
-        </p>
-      </section>
-
-      {/* Services Grid */}
-      <section ref={servicesRef} id="services" className="py-24 px-6" style={{ background: '#f2ede6' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-[10px] tracking-[0.55em] uppercase mb-4 font-medium" style={{ color: accent }}>Explore</p>
-            <h2 className="font-display font-light" style={{ fontSize: '2.1rem', color: primary, letterSpacing: '0.04em' }}>Our Services</h2>
-          </div>
-
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0.5">
-              {[...Array(6)].map((_, i) => <div key={i} className="h-80 animate-pulse" style={{ background: '#e0d8cc' }} />)}
-            </div>
-          ) : (
-            <div className={`grid gap-0.5 ${settings.layout_style === 'list' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
-              {categories.map((cat, idx) => (
-                <Link
-                  key={cat.id}
-                  href={`/services/${cat.slug}`}
-                  className="group relative overflow-hidden block"
-                  style={{ height: idx === 0 ? '420px' : '340px' }}
-                >
-                  {/* Carousel of category images */}
-                  <CategoryCarousel slug={cat.slug} categoryName={cat.name} />
-
-                  <div className="absolute inset-0 transition-opacity duration-500" style={{ background: 'linear-gradient(to top, rgba(8,6,3,0.85) 0%, rgba(8,6,3,0.05) 55%, transparent 100%)' }} />
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: 'rgba(8,6,3,0.2)' }} />
-                  <div className="absolute top-0 left-0 right-0 h-0.5 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500" style={{ background: accent }} />
-
-                  <div className="absolute inset-0 flex flex-col justify-end p-8 pb-9">
-                    <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-400 ease-out">
-                      <p className="text-[9px] tracking-[0.5em] uppercase mb-2.5 font-medium" style={{ color: accent }}>
-                        {CATEGORY_LABEL[cat.slug] || 'Experience'}
-                      </p>
-                      <h3 className="font-display font-light text-white mb-5" style={{ fontSize: '1.6rem', letterSpacing: '0.04em', lineHeight: 1.2 }}>
-                        {cat.name}
-                      </h3>
-                      <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">
-                        <div style={{ height: '1px', width: '22px', background: accent }} />
-                        <span className="text-[9px] tracking-[0.45em] uppercase" style={{ color: accent }}>Explore</span>
+      {/* Services */}
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {category.services.map((service: any) => {
+            const serviceImages = getServiceImages(service);
+            return (
+              <div
+                key={service.id}
+                className="card cursor-pointer group hover:shadow-xl transition-all duration-300 animate-slide-up bg-white"
+                onClick={() => setSelectedService(service)}
+              >
+                {/* Image */}
+                <div className="relative h-48 overflow-hidden bg-charcoal-100">
+                  {serviceImages.length > 0 ? (
+                    <ImageSlider
+                      images={serviceImages}
+                      alt={service.name}
+                      className="w-full h-48"
+                    />
+                  ) : (
+                    <div
+                      className="w-full h-full bg-cover bg-center"
+                      style={{ backgroundImage: `url(${CATEGORY_BG[category.slug] || 'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=900&q=90'})` }}
+                    >
+                      <div className="w-full h-full flex items-end justify-start p-3" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.5), transparent)' }}>
+                        <span className="text-white/60 text-xs">{category.name}</span>
                       </div>
                     </div>
+                  )}
+                  {serviceImages.length > 1 && (
+                    <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded-full pointer-events-none">
+                      {serviceImages.length} photos
+                    </div>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="p-5">
+                  <h3 className="font-medium text-charcoal-900 mb-2 leading-snug">{service.name}</h3>
+                  {service.description && (
+                    <p className="text-charcoal-500 text-xs leading-relaxed mb-3 line-clamp-2">{service.description}</p>
+                  )}
+                  <div className="flex items-center justify-between pt-3 border-t border-charcoal-100">
+                    {service.priceInfo ? (
+                      <p className="text-charcoal-900 font-medium text-sm">{service.priceInfo}</p>
+                    ) : (
+                      <span />
+                    )}
+                    <span className="text-xs tracking-widest uppercase transition-colors" style={{ color: accent }}>Details →</span>
                   </div>
-                </Link>
-              ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Service Detail Modal — NO contact info shown to guests */}
+      {selectedService && (
+        <div
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setSelectedService(null)}
+        >
+          <div
+            className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Image slider in modal */}
+            {(() => {
+              const imgs = getServiceImages(selectedService);
+              return imgs.length > 0 ? (
+                <div className="relative">
+                  <ImageSlider images={imgs} alt={selectedService.name} className="w-full h-64" />
+                  {/* Click to fullscreen */}
+                  <button
+                    onClick={() => openFullscreen(imgs, 0)}
+                    className="absolute bottom-3 right-3 bg-black/50 hover:bg-black/70 text-white text-[10px] tracking-widest uppercase px-3 py-1.5 transition-colors"
+                  >
+                    ⛶ Full Screen
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="h-48 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${CATEGORY_BG[category.slug] || 'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=900&q=90'})` }}
+                />
+              );
+            })()}
+
+            <div className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <h2 className="font-display text-2xl font-light text-charcoal-900">{selectedService.name}</h2>
+                <button onClick={() => setSelectedService(null)} className="text-charcoal-400 hover:text-charcoal-900 ml-4 flex-shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              {selectedService.description && (
+                <p className="text-charcoal-600 text-sm leading-relaxed mb-4">{selectedService.description}</p>
+              )}
+
+              <div className="space-y-3 border-t border-charcoal-100 pt-4">
+                {selectedService.priceInfo && (
+                  <div className="flex justify-between">
+                    <span className="text-xs tracking-widest uppercase text-charcoal-400">Price</span>
+                    <span className="text-charcoal-900 font-medium text-sm">{selectedService.priceInfo}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 p-4 rounded" style={{ background: `${accent}15`, border: `1px solid ${accent}33` }}>
+                <p className="text-xs text-charcoal-600 text-center leading-relaxed">
+                  Please contact the concierge desk to arrange this service.
+                  <br />
+                  <span className="font-medium" style={{ color: accent }}>We are available 24 hours a day.</span>
+                </p>
+              </div>
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* Concierge strip - improved readability */}
-      <section className="relative py-28 px-6 text-center overflow-hidden">
-        {/* Background with blur overlay */}
-        <div className="absolute inset-0">
-          <img
-            src="https://images.unsplash.com/photo-1439130490301-25e322d88054?w=1920&q=80"
-            alt=""
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0" style={{ background: 'rgba(10, 8, 5, 0.72)', backdropFilter: 'blur(2px)' }} />
-        </div>
-        <div className="relative max-w-2xl mx-auto">
-          <p className="text-[10px] tracking-[0.55em] uppercase mb-5 font-medium" style={{ color: accent }}>Always Available</p>
-          <h2 className="font-display font-light mb-7 text-white" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', letterSpacing: '0.04em' }}>
-            Your Personal Concierge
-          </h2>
-          <div className="flex items-center justify-center gap-5 mb-8">
-            <div style={{ height: '1px', width: '40px', background: `linear-gradient(to right, transparent, ${accent})` }} />
-            <div style={{ width: '4px', height: '4px', background: accent, transform: 'rotate(45deg)', flexShrink: 0 }} />
-            <div style={{ height: '1px', width: '40px', background: `linear-gradient(to left, transparent, ${accent})` }} />
           </div>
-          <p style={{ color: 'rgba(255,255,255,0.75)', lineHeight: 2.1, fontSize: '0.9rem', marginBottom: '2.5rem' }}>
-            Our team is available around the clock to arrange any experience, transfer or activity during your stay at Raffles Praslin Seychelles.
-          </p>
-          <p className="text-[10px] tracking-[0.5em] uppercase" style={{ color: accent, opacity: 0.8 }}>
-            Anse Takamaka · Praslin · Seychelles
-          </p>
         </div>
-      </section>
+      )}
 
-      {/* Footer - brighter */}
-      <footer style={{ background: '#2c2820', borderTop: `1px solid ${accent}33` }} className="py-12 text-center">
-        <p className="font-display font-light tracking-[0.3em] mb-3" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.95rem' }}>
-          RAFFLES SEYCHELLES · PRASLIN
-        </p>
-        <div className="flex items-center justify-center gap-5 mb-5">
-          <div style={{ height: '1px', width: '30px', background: `linear-gradient(to right, transparent, ${accent}88)` }} />
-          <div style={{ width: '3px', height: '3px', background: accent, transform: 'rotate(45deg)', opacity: 0.6 }} />
-          <div style={{ height: '1px', width: '30px', background: `linear-gradient(to left, transparent, ${accent}88)` }} />
-        </div>
-        <p className="text-xs mb-2" style={{ color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>
-          Anse Takamaka, Praslin Island, Seychelles
-        </p>
-        <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.25)', letterSpacing: '0.12em' }}>
-          © {new Date().getFullYear()} Raffles Hotels & Resorts. All rights reserved.
-        </p>
-      </footer>
+      {/* Fullscreen image preview */}
+      {fullscreenImages && (
+        <FullscreenPreview
+          images={fullscreenImages}
+          startIndex={fullscreenStart}
+          onClose={() => setFullscreenImages(null)}
+        />
+      )}
+
+      {/* Back */}
+      <div className="fixed bottom-6 left-6">
+        <Link href="/" className="text-white px-4 py-2 text-xs tracking-widest uppercase flex items-center gap-2 shadow-lg transition-colors" style={{ background: primary }}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          Back
+        </Link>
+      </div>
     </div>
   );
 }
