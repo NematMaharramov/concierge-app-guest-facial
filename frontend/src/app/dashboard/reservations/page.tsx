@@ -5,6 +5,8 @@ import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+// FIX 6: Import scroll lock hook
+import { useModalScrollLock } from '@/lib/useModalScrollLock';
 
 const statusColors: Record<string, string> = {
   PENDING: 'bg-amber-100 text-amber-800',
@@ -22,6 +24,10 @@ export default function ReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ serviceId: '', guestName: '', guestCount: 1, dateTime: '', notes: '', totalPrice: '', currency: 'EUR' });
   const [saving, setSaving] = useState(false);
+
+  // FIX 6: Lock body scroll whenever the new-reservation modal is open
+  useModalScrollLock(showNew);
+
   const load = () => getReservations().then(setReservations).finally(() => setLoading(false));
 
   useEffect(() => {
@@ -103,7 +109,7 @@ export default function ReservationsPage() {
                     <td className="px-5 py-4">
                       <div className="flex gap-3">
                         <Link href={`/dashboard/reservations/${r.id}`} className="text-gold-500 hover:text-gold-600 text-xs tracking-widest uppercase">Edit</Link>
-                        <button onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600 text-xs tracking-widest uppercase">Del</button>
+                        <button onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600 text-xs tracking-widest uppercase">Delete</button>
                       </div>
                     </td>
                   </tr>
