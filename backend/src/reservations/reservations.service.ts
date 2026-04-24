@@ -14,6 +14,8 @@ export class CreateReservationDto {
 }
 
 export class UpdateReservationDto {
+  // FIX 1: serviceId was missing — frontend sends it but whitelist:true was silently stripping it
+  @IsString() @IsOptional() serviceId?: string;
   @IsString() @IsOptional() guestName?: string;
   @IsNumber() @IsOptional() guestCount?: number;
   @IsDateString() @IsOptional() dateTime?: string;
@@ -88,15 +90,33 @@ export class ReservationsService {
     const existing = await this.findOne(id, userId, role);
     if (role !== 'ADMIN' && existing.userId !== userId) throw new ForbiddenException();
 
+    // FIX 1: Build update data explicitly so serviceId is included when provided
+    const updateData: any = {};
+    if (dto.serviceId !== undefined) updateData.serviceId = dto.serviceId;
+    if (dto.guestName !== undefined) updateData.guestName = dto.guestName;
+    if (dto.guestCount !== undefined) updateData.guestCount = dto.guestCount;
+    if (dto.dateTime !== undefined) updateData.dateTime = new Date(dto.dateTime);
+    if (dto.status !== undefined) updateData.status = dto.status as any;
+    if (dto.notes !== undefined) updateData.notes = dto.notes;
+    if (dto.totalPrice !== undefined) updateData.totalPrice = dto.totalPrice;
+    if (dto.currency !== undefined) updateData.currency = dto.currency;
+
     const updated = await this.prisma.reservation.update({
       where: { id },
-      data: {
-        ...dto,
-        ...(dto.dateTime ? { dateTime: new Date(dto.dateTime) } : {}),
-        status: dto.status as any,
-      },
+      data: updateData,
       include: { service: { include: { category: true } } },
     });
+
+    // Store only the changed fields in audit log, not the full existing object
+    const changedFields: Record<string, { before: any; after: any }> = {};
+    for (const key of Object.keys(dto) as (keyof UpdateReservationDto)[]) {
+      if (dto[key] !== undefined) {
+        changedFields[key] = {
+          before: (existing as any)[key],
+          after: dto[key],
+        };
+      }
+    }
 
     await this.auditService.log({
       userId,
@@ -104,7 +124,7 @@ export class ReservationsService {
       entityType: 'Reservation',
       entityId: id,
       reservationId: id,
-      changes: { before: existing, after: dto },
+      changes: changedFields,
       ipAddress: ip,
     });
 
@@ -121,23 +141,31 @@ export class ReservationsService {
       entityType: 'Reservation',
       entityId: id,
       reservationId: id,
-      changes: { deleted: existing },
+      // FIX 1 (audit): Store only key fields, not the full nested object
+      changes: {
+        guestName: existing.guestName,
+        serviceId: existing.serviceId,
+        dateTime: existing.dateTime,
+        status: existing.status,
+      },
       ipAddress: ip,
     });
 
     return this.prisma.reservation.delete({ where: { id } });
   }
 
+  // FIX 3: Add NOT_ARRANGED to stats
   getStats() {
     return this.prisma.$transaction([
       this.prisma.reservation.count(),
       this.prisma.reservation.count({ where: { status: 'ARRANGED' } }),
       this.prisma.reservation.count({ where: { status: 'PENDING' } }),
       this.prisma.reservation.count({ where: { status: 'CANCELLED' } }),
+      this.prisma.reservation.count({ where: { status: 'NOT_ARRANGED' } }),
       this.prisma.service.count(),
       this.prisma.user.count({ where: { role: 'CONCIERGE' } }),
-    ]).then(([total, arranged, pending, cancelled, services, users]) => ({
-      total, arranged, pending, cancelled, services, users,
+    ]).then(([total, arranged, pending, cancelled, notArranged, services, users]) => ({
+      total, arranged, pending, cancelled, notArranged, services, users,
     }));
   }
 }
