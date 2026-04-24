@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { IsEmail, IsString, IsEnum, IsOptional } from 'class-validator';
@@ -63,6 +63,27 @@ export class UsersService {
 
   async remove(id: string) {
     await this.findOne(id);
+
+    // FIX 2: Check for reservations owned by this user before deleting.
+    // Deleting a user with reservations would violate the FK constraint on
+    // Reservation.userId (no cascade defined) and throw a 500 in production.
+    const reservationCount = await this.prisma.reservation.count({ where: { userId: id } });
+    if (reservationCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete user: they have ${reservationCount} reservation(s) on record. ` +
+        `Deactivate the account instead, or reassign their reservations first.`
+      );
+    }
+
+    // AuditLog.userId also has no cascade, so check that too.
+    const auditCount = await this.prisma.auditLog.count({ where: { userId: id } });
+    if (auditCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete user: they have ${auditCount} audit log entry/entries. ` +
+        `Deactivate the account instead to preserve the audit trail.`
+      );
+    }
+
     return this.prisma.user.delete({ where: { id } });
   }
 }
