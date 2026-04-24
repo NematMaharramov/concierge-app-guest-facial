@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { IsString, IsOptional, IsBoolean, IsNumber } from 'class-validator';
 
@@ -60,7 +60,28 @@ export class ServicesService {
     return service;
   }
 
-  create(dto: CreateServiceDto) {
+  /**
+   * Create a service.
+   * Rejects with 409 Conflict if a service with the same name already exists
+   * in the same category — prevents accidental duplicates without touching
+   * any existing data.
+   */
+  async create(dto: CreateServiceDto) {
+    // Duplicate check: same name in the same category
+    const existing = await this.prisma.service.findFirst({
+      where: {
+        categoryId: dto.categoryId,
+        name: { equals: dto.name, mode: 'insensitive' },
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `A service named "${dto.name}" already exists in this category. ` +
+        `Please use a unique name or edit the existing service.`,
+      );
+    }
+
     return this.prisma.service.create({
       data: dto,
       include: { category: true, images: true },
