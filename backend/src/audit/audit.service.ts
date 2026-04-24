@@ -26,11 +26,7 @@ export class AuditService {
     });
   }
 
-  findByReservation(reservationId: string) {
-    return this.prisma.auditLog.findMany({
-      where: { reservationId },
-      orderBy: { createdAt: 'asc' },
-      include: { user: { select: { name: true, email: true, role: true } } },
-    });
-  }
+  // FIX 7: findByReservation() was dead code — the reservation detail page
+  // fetches audit logs via the reservation's own Prisma include, not this method.
+  // Removed to avoid confusion about which path is authoritative.
 }
