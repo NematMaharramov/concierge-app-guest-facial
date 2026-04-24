@@ -29,20 +29,21 @@ export default function DashboardPage() {
         <h1 className="font-display text-3xl font-light text-charcoal-900">Welcome, {user?.name}</h1>
       </div>
 
-      {/* Stats */}
+      {/* FIX 3: Added NOT_ARRANGED tile — was counted in DB but never shown */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {[
             { label: 'Total', value: stats.total, color: 'text-charcoal-900' },
             { label: 'Arranged', value: stats.arranged, color: 'text-green-600' },
             { label: 'Pending', value: stats.pending, color: 'text-amber-600' },
-            { label: 'Cancelled', value: stats.cancelled, color: 'text-red-500' },
+            { label: 'Not Arranged', value: stats.notArranged, color: 'text-red-500' },
+            { label: 'Cancelled', value: stats.cancelled, color: 'text-charcoal-400' },
             { label: 'Services', value: stats.services, color: 'text-charcoal-600' },
             { label: 'Staff', value: stats.users, color: 'text-charcoal-600' },
           ].map(s => (
             <div key={s.label} className="bg-white border border-charcoal-100 p-5">
               <p className="text-xs tracking-widest uppercase text-charcoal-400 mb-2">{s.label}</p>
-              <p className={`text-3xl font-light ${s.color}`}>{s.value}</p>
+              <p className={`text-3xl font-light ${s.color}`}>{s.value ?? '—'}</p>
             </div>
           ))}
         </div>
