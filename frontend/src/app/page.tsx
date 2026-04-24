@@ -37,23 +37,42 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // FIX 5: Apply admin-configured brand colours to CSS custom properties so
+  // they cascade into all inline styles that reference these variables.
+  // Previously the settings were fetched and stored but never consumed.
+  useEffect(() => {
+    if (!settings.primary_color && !settings.accent_color) return;
+    const root = document.documentElement;
+    if (settings.primary_color) root.style.setProperty('--brand-primary', settings.primary_color);
+    if (settings.accent_color) root.style.setProperty('--brand-accent', settings.accent_color);
+  }, [settings.primary_color, settings.accent_color]);
+
+  // Resolve colours: prefer settings value, fall back to design defaults
+  const primary = settings.primary_color || '#1a1a1a';
+  const accent = settings.accent_color || '#c9a96e';
+  // Derive a lighter tint of accent for text on dark backgrounds
+  const accentLight = settings.accent_color ? `${settings.accent_color}cc` : '#e8d5a3';
+
   return (
     <div className="min-h-screen" style={{ background: '#f2ede6' }}>
 
-      {/* Navigation — no staff login shown */}
+      {/* Navigation */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'bg-white/98 shadow-sm backdrop-blur-sm' : 'bg-transparent'}`}>
         <div className="max-w-7xl mx-auto px-8 py-5 flex items-center justify-between">
           <div>
             <p className={`font-display text-lg tracking-[0.22em] font-light transition-colors duration-300 ${scrolled ? 'text-[#1a1a1a]' : 'text-white'}`}>
               RAFFLES PRASLIN
             </p>
-            <p className={`text-[9px] tracking-[0.45em] uppercase font-medium transition-colors duration-300 ${scrolled ? 'text-[#c9a96e]' : 'text-[#e8d5a3]'}`}>
+            {/* FIX 5: accent colour applied dynamically */}
+            <p className="text-[9px] tracking-[0.45em] uppercase font-medium transition-colors duration-300"
+              style={{ color: scrolled ? accent : accentLight }}>
               Seychelles
             </p>
           </div>
           <a
             href="#services"
-            className={`text-[10px] tracking-[0.35em] uppercase transition-colors duration-300 ${scrolled ? 'text-[#1a1a1a] hover:text-[#c9a96e]' : 'text-white/80 hover:text-white'}`}
+            className={`text-[10px] tracking-[0.35em] uppercase transition-colors duration-300 ${scrolled ? 'hover:opacity-70' : 'text-white/80 hover:text-white'}`}
+            style={scrolled ? { color: primary } : {}}
           >
             Our Services
           </a>
@@ -71,23 +90,23 @@ export default function HomePage() {
           <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(10,8,5,0.28) 0%, rgba(10,8,5,0.10) 45%, rgba(10,8,5,0.48) 100%)' }} />
         </div>
         <div className="relative text-center text-white px-6 animate-fade-in">
-          <p className="text-[10px] tracking-[0.65em] uppercase mb-8 font-light" style={{ color: '#e8d5a3', letterSpacing: '0.55em' }}>
+          <p className="text-[10px] tracking-[0.65em] uppercase mb-8 font-light" style={{ color: accentLight, letterSpacing: '0.55em' }}>
             Concierge Services
           </p>
           <h1 className="font-display font-light mb-7" style={{ fontSize: 'clamp(3rem, 7.5vw, 6rem)', lineHeight: 1.05, letterSpacing: '0.06em' }}>
             {settings.site_title || 'Raffles Praslin'}
           </h1>
           <div className="flex items-center justify-center gap-5 mb-8">
-            <div style={{ height: '1px', width: '50px', background: 'linear-gradient(to right, transparent, #c9a96e)' }} />
-            <div style={{ width: '5px', height: '5px', background: '#c9a96e', transform: 'rotate(45deg)', flexShrink: 0 }} />
-            <div style={{ height: '1px', width: '50px', background: 'linear-gradient(to left, transparent, #c9a96e)' }} />
+            <div style={{ height: '1px', width: '50px', background: `linear-gradient(to right, transparent, ${accent})` }} />
+            <div style={{ width: '5px', height: '5px', background: accent, transform: 'rotate(45deg)', flexShrink: 0 }} />
+            <div style={{ height: '1px', width: '50px', background: `linear-gradient(to left, transparent, ${accent})` }} />
           </div>
           <p className="font-light tracking-wider text-white/70" style={{ fontSize: '1.05rem', maxWidth: '460px', margin: '0 auto 3.5rem', lineHeight: 1.9 }}>
             {settings.site_subtitle || 'Every experience, thoughtfully arranged for you'}
           </p>
           <a
             href="#services"
-            className="inline-block text-[10px] tracking-[0.45em] uppercase transition-all duration-400 hover:bg-white hover:text-[#1a1a1a]"
+            className="inline-block text-[10px] tracking-[0.45em] uppercase transition-all duration-400 hover:bg-white"
             style={{ border: '1px solid rgba(255,255,255,0.5)', color: 'white', padding: '15px 50px', letterSpacing: '0.4em' }}
           >
             Discover
@@ -101,14 +120,14 @@ export default function HomePage() {
 
       {/* Intro band */}
       <section className="py-28 px-6 text-center bg-white">
-        <p className="text-[10px] tracking-[0.55em] uppercase mb-6 font-medium" style={{ color: '#c9a96e' }}>Curated For You</p>
-        <h2 className="font-display font-light mb-7" style={{ fontSize: 'clamp(2.1rem, 4vw, 3rem)', color: '#1a1a1a', letterSpacing: '0.04em' }}>
+        <p className="text-[10px] tracking-[0.55em] uppercase mb-6 font-medium" style={{ color: accent }}>Curated For You</p>
+        <h2 className="font-display font-light mb-7" style={{ fontSize: 'clamp(2.1rem, 4vw, 3rem)', color: primary, letterSpacing: '0.04em' }}>
           Extraordinary Experiences
         </h2>
         <div className="flex items-center justify-center gap-5 mb-9">
-          <div style={{ height: '1px', width: '40px', background: 'linear-gradient(to right, transparent, #c9a96e)' }} />
-          <div style={{ width: '4px', height: '4px', background: '#c9a96e', transform: 'rotate(45deg)', flexShrink: 0 }} />
-          <div style={{ height: '1px', width: '40px', background: 'linear-gradient(to left, transparent, #c9a96e)' }} />
+          <div style={{ height: '1px', width: '40px', background: `linear-gradient(to right, transparent, ${accent})` }} />
+          <div style={{ width: '4px', height: '4px', background: accent, transform: 'rotate(45deg)', flexShrink: 0 }} />
+          <div style={{ height: '1px', width: '40px', background: `linear-gradient(to left, transparent, ${accent})` }} />
         </div>
         <p className="mx-auto" style={{ color: '#aaa', maxWidth: '520px', lineHeight: 2.1, fontSize: '0.875rem' }}>
           From private island excursions to seamless helicopter transfers and championship golf,
@@ -120,8 +139,8 @@ export default function HomePage() {
       <section id="services" className="py-24 px-6" style={{ background: '#f2ede6' }}>
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <p className="text-[10px] tracking-[0.55em] uppercase mb-4 font-medium" style={{ color: '#c9a96e' }}>Explore</p>
-            <h2 className="font-display font-light" style={{ fontSize: '2.1rem', color: '#1a1a1a', letterSpacing: '0.04em' }}>Our Services</h2>
+            <p className="text-[10px] tracking-[0.55em] uppercase mb-4 font-medium" style={{ color: accent }}>Explore</p>
+            <h2 className="font-display font-light" style={{ fontSize: '2.1rem', color: primary, letterSpacing: '0.04em' }}>Our Services</h2>
           </div>
 
           {loading ? (
@@ -142,25 +161,23 @@ export default function HomePage() {
                     alt={cat.name}
                     className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-107"
                   />
-                  {/* Dark overlay */}
                   <div className="absolute inset-0 transition-opacity duration-500" style={{ background: 'linear-gradient(to top, rgba(8,6,3,0.82) 0%, rgba(8,6,3,0.05) 55%, transparent 100%)' }} />
-                  {/* Hover tint */}
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: 'rgba(8,6,3,0.18)' }} />
 
-                  {/* Gold top border on hover */}
-                  <div className="absolute top-0 left-0 right-0 h-0.5 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500" style={{ background: '#c9a96e' }} />
+                  {/* FIX 5: Gold top border uses dynamic accent colour */}
+                  <div className="absolute top-0 left-0 right-0 h-0.5 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500" style={{ background: accent }} />
 
                   <div className="absolute inset-0 flex flex-col justify-end p-8 pb-9">
                     <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-400 ease-out">
-                      <p className="text-[9px] tracking-[0.5em] uppercase mb-2.5 font-medium" style={{ color: '#c9a96e' }}>
+                      <p className="text-[9px] tracking-[0.5em] uppercase mb-2.5 font-medium" style={{ color: accent }}>
                         {CATEGORY_LABEL[cat.slug] || 'Experience'}
                       </p>
                       <h3 className="font-display font-light text-white mb-5" style={{ fontSize: '1.6rem', letterSpacing: '0.04em', lineHeight: 1.2 }}>
                         {cat.name}
                       </h3>
                       <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">
-                        <div style={{ height: '1px', width: '22px', background: '#c9a96e' }} />
-                        <span className="text-[9px] tracking-[0.45em] uppercase" style={{ color: '#c9a96e' }}>Explore</span>
+                        <div style={{ height: '1px', width: '22px', background: accent }} />
+                        <span className="text-[9px] tracking-[0.45em] uppercase" style={{ color: accent }}>Explore</span>
                       </div>
                     </div>
                   </div>
@@ -174,26 +191,26 @@ export default function HomePage() {
       {/* Concierge strip */}
       <section className="py-24 px-6 text-center" style={{ background: '#fff' }}>
         <div className="max-w-2xl mx-auto">
-          <p className="text-[10px] tracking-[0.55em] uppercase mb-5 font-medium" style={{ color: '#c9a96e' }}>Always Available</p>
-          <h2 className="font-display font-light mb-7" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', color: '#1a1a1a', letterSpacing: '0.04em' }}>
+          <p className="text-[10px] tracking-[0.55em] uppercase mb-5 font-medium" style={{ color: accent }}>Always Available</p>
+          <h2 className="font-display font-light mb-7" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', color: primary, letterSpacing: '0.04em' }}>
             Your Personal Concierge
           </h2>
           <div className="flex items-center justify-center gap-5 mb-8">
-            <div style={{ height: '1px', width: '40px', background: 'linear-gradient(to right, transparent, #c9a96e)' }} />
-            <div style={{ width: '4px', height: '4px', background: '#c9a96e', transform: 'rotate(45deg)', flexShrink: 0 }} />
-            <div style={{ height: '1px', width: '40px', background: 'linear-gradient(to left, transparent, #c9a96e)' }} />
+            <div style={{ height: '1px', width: '40px', background: `linear-gradient(to right, transparent, ${accent})` }} />
+            <div style={{ width: '4px', height: '4px', background: accent, transform: 'rotate(45deg)', flexShrink: 0 }} />
+            <div style={{ height: '1px', width: '40px', background: `linear-gradient(to left, transparent, ${accent})` }} />
           </div>
           <p style={{ color: '#bbb', lineHeight: 2.1, fontSize: '0.875rem', marginBottom: '2.5rem' }}>
             Our team is available around the clock to arrange any experience, transfer or activity during your stay at Raffles Praslin.
           </p>
-          <p className="text-[10px] tracking-[0.5em] uppercase" style={{ color: '#c9a96e', opacity: 0.7 }}>
+          <p className="text-[10px] tracking-[0.5em] uppercase" style={{ color: accent, opacity: 0.7 }}>
             Anse Takamaka · Praslin · Seychelles
           </p>
         </div>
       </section>
 
       {/* Footer */}
-      <footer style={{ background: '#16140f', borderTop: '1px solid rgba(201,169,110,0.12)' }} className="py-10 text-center">
+      <footer style={{ background: '#16140f', borderTop: `1px solid ${accent}1f` }} className="py-10 text-center">
         <p className="font-display font-light tracking-[0.3em] mb-2" style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.8rem' }}>
           RAFFLES PRASLIN · SEYCHELLES
         </p>
