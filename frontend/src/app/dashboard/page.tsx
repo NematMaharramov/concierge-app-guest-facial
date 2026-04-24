@@ -1,322 +1,245 @@
 'use client';
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { getCategories, getSettings } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { getStats, getReservations } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
+import { format } from 'date-fns';
 
-const CATEGORY_BG: Record<string, string> = {
-  'taxi-transfers': 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=1200&q=90',
-  'boat-excursions': 'https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?w=1200&q=90',
-  'catamaran': 'https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=1200&q=90',
-  'car-rental': 'https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?w=1200&q=90',
-  'golf': 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=1200&q=90',
-  'helicopter': 'https://images.unsplash.com/photo-1540962351504-03099e0a754b?w=1200&q=90',
+const statusColors: Record<string, string> = {
+  PENDING: 'bg-amber-100 text-amber-800',
+  ARRANGED: 'bg-green-100 text-green-800',
+  NOT_ARRANGED: 'bg-red-100 text-red-800',
+  CANCELLED: 'bg-charcoal-100 text-charcoal-600',
+  COMPLETED: 'bg-blue-100 text-blue-800',
 };
 
-const CATEGORY_EXTRA_IMAGES: Record<string, string[]> = {
-  'taxi-transfers': [
-    'https://images.unsplash.com/photo-1590556409324-aa1d726e5c3c?w=1200&q=90',
-    'https://images.unsplash.com/photo-1559416523-140ddc3d238c?w=1200&q=90',
-  ],
-  'boat-excursions': [
-    'https://images.unsplash.com/photo-1534190760961-74e8c1c5c3da?w=1200&q=90',
-    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&q=90',
-  ],
-  'catamaran': [
-    'https://images.unsplash.com/photo-1599640842225-85d111c60e6b?w=1200&q=90',
-    'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1200&q=90',
-  ],
-  'car-rental': [
-    'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=1200&q=90',
-    'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?w=1200&q=90',
-  ],
-  'golf': [
-    'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=1200&q=90',
-    'https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=1200&q=90',
-  ],
-  'helicopter': [
-    'https://images.unsplash.com/photo-1608236415053-8c3e0a1cb1e9?w=1200&q=90',
-    'https://images.unsplash.com/photo-1557800634-7d5f1e5e0af4?w=1200&q=90',
-  ],
+const statusDot: Record<string, string> = {
+  PENDING: 'bg-amber-400',
+  ARRANGED: 'bg-green-400',
+  NOT_ARRANGED: 'bg-red-400',
+  CANCELLED: 'bg-charcoal-300',
+  COMPLETED: 'bg-blue-400',
 };
 
-const CATEGORY_LABEL: Record<string, string> = {
-  'taxi-transfers': 'Island Transfers',
-  'boat-excursions': 'Ocean Escapes',
-  'catamaran': 'Private Charters',
-  'car-rental': 'Self Discovery',
-  'golf': 'Golf & Leisure',
-  'helicopter': 'Aerial Journeys',
-};
-
-// Carousel component for category cards
-function CategoryCarousel({ slug, categoryName }: { slug: string; categoryName: string }) {
-  const images = [CATEGORY_BG[slug] || 'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=1200&q=90', ...(CATEGORY_EXTRA_IMAGES[slug] || [])];
-  const [current, setCurrent] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+// ─── Admin Dashboard ──────────────────────────────────────────────────────────
+function AdminDashboard() {
+  const [stats, setStats] = useState<any>(null);
+  const [recent, setRecent] = useState<any[]>([]);
 
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setCurrent(c => (c + 1) % images.length);
-    }, 3500 + Math.random() * 1000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [images.length]);
+    getStats().then(setStats);
+    getReservations().then((data) => setRecent(data.slice(0, 8)));
+  }, []);
 
   return (
-    <div className="absolute inset-0">
-      {images.map((src, i) => (
-        <img
-          key={src}
-          src={src}
-          alt={categoryName}
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
-          style={{ opacity: i === current ? 1 : 0 }}
-        />
-      ))}
+    <div className="space-y-8 animate-fade-in">
+      <div>
+        <p className="text-xs tracking-[0.4em] uppercase text-gold-500 mb-1">Admin Overview</p>
+        <h1 className="font-display text-3xl font-light text-charcoal-900">Dashboard</h1>
+      </div>
+
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {[
+            { label: 'Total', value: stats.total, color: 'text-charcoal-900', bg: 'bg-white' },
+            { label: 'Arranged', value: stats.arranged, color: 'text-green-600', bg: 'bg-white' },
+            { label: 'Pending', value: stats.pending, color: 'text-amber-600', bg: 'bg-white' },
+            { label: 'Not Arranged', value: stats.notArranged, color: 'text-red-500', bg: 'bg-white' },
+            { label: 'Cancelled', value: stats.cancelled, color: 'text-charcoal-400', bg: 'bg-white' },
+          ].map(s => (
+            <div key={s.label} className={`${s.bg} border border-charcoal-100 p-5`}>
+              <p className="text-xs tracking-widest uppercase text-charcoal-400 mb-2">{s.label}</p>
+              <p className={`text-3xl font-light ${s.color}`}>{s.value ?? '—'}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Recent Reservations */}
+      <div className="bg-white border border-charcoal-100">
+        <div className="px-6 py-4 border-b border-charcoal-100 flex items-center justify-between">
+          <h2 className="font-medium text-charcoal-900 tracking-wide">Recent Reservations</h2>
+          <Link href="/dashboard/reservations" className="text-xs tracking-widest uppercase text-gold-500 hover:text-gold-600">View All →</Link>
+        </div>
+        <div className="divide-y divide-charcoal-50">
+          {recent.length === 0 ? (
+            <p className="text-charcoal-400 text-sm p-6 text-center">No reservations yet.</p>
+          ) : recent.map(r => (
+            <Link key={r.id} href={`/dashboard/reservations/${r.id}`} className="flex items-center gap-4 px-6 py-3.5 hover:bg-charcoal-50 transition-colors">
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot[r.status] || 'bg-charcoal-300'}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-charcoal-900 truncate">{r.guestName}</p>
+                <p className="text-xs text-charcoal-400 truncate">{r.service?.name}</p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-xs text-charcoal-500">{format(new Date(r.dateTime), 'dd MMM yyyy')}</p>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColors[r.status]}`}>{r.status}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Admin Quick Actions */}
+      <div>
+        <p className="text-xs tracking-widest uppercase text-charcoal-400 mb-4">Quick Actions</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Link href="/dashboard/admin/services" className="bg-gold-500 text-white p-5 hover:bg-gold-600 transition-colors group">
+            <p className="text-xl mb-2">🏝️</p>
+            <h3 className="font-medium tracking-wide text-sm mb-1">Manage Services</h3>
+            <p className="text-white/70 text-xs">Add, edit, organise services</p>
+          </Link>
+          <Link href="/dashboard/admin/categories" className="bg-charcoal-800 text-white p-5 hover:bg-charcoal-700 transition-colors group">
+            <p className="text-xl mb-2">📁</p>
+            <h3 className="font-medium tracking-wide text-sm mb-1">Categories</h3>
+            <p className="text-white/60 text-xs">Manage service categories</p>
+          </Link>
+          <Link href="/dashboard/admin/users" className="bg-charcoal-900 text-white p-5 hover:bg-charcoal-800 transition-colors group">
+            <p className="text-xl mb-2">👥</p>
+            <h3 className="font-medium tracking-wide text-sm mb-1">Staff Users</h3>
+            <p className="text-white/60 text-xs">Manage concierge accounts</p>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
 
-export default function HomePage() {
-  const [categories, setCategories] = useState<any[]>([]);
-  const [settings, setSettings] = useState<any>({});
+// ─── Concierge (User) Dashboard ───────────────────────────────────────────────
+function ConciergeDashboard({ userName }: { userName: string }) {
+  const [reservations, setReservations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Header hide/show on scroll
-  const [headerVisible, setHeaderVisible] = useState(false);
-  const [lastScrollY, setLastScrollY] = useState(0);
-  const servicesRef = useRef<HTMLElement>(null);
-  const heroRef = useRef<HTMLElement>(null);
-
   useEffect(() => {
-    Promise.all([getCategories(), getSettings()])
-      .then(([cats, sets]) => { setCategories(cats); setSettings(sets); })
-      .finally(() => setLoading(false));
+    getReservations().then(data => {
+      setReservations(data);
+      setLoading(false);
+    });
   }, []);
 
-  useEffect(() => {
-    if (!settings.primary_color && !settings.accent_color) return;
-    const root = document.documentElement;
-    if (settings.primary_color) root.style.setProperty('--brand-primary', settings.primary_color);
-    if (settings.accent_color) root.style.setProperty('--brand-accent', settings.accent_color);
-  }, [settings.primary_color, settings.accent_color]);
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollY = window.scrollY;
-      const servicesTop = servicesRef.current?.offsetTop ?? 9999;
+  const todayItems = reservations.filter(r => {
+    try { return format(new Date(r.dateTime), 'yyyy-MM-dd') === todayStr; } catch { return false; }
+  });
 
-      // Header invisible until leaving hero, reappears when scrolling up
-      // But NOT when in the services section
-      const inServicesSection = scrollY >= servicesTop - 100;
-
-      if (inServicesSection) {
-        setHeaderVisible(false);
-      } else if (scrollY < 80) {
-        setHeaderVisible(false);
-      } else if (scrollY < lastScrollY) {
-        // Scrolling up
-        setHeaderVisible(true);
-      } else {
-        // Scrolling down
-        setHeaderVisible(false);
-      }
-
-      setLastScrollY(scrollY);
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
-
-  const primary = settings.primary_color || '#1a1a1a';
-  const accent = settings.accent_color || '#c9a96e';
-  const accentLight = settings.accent_color ? `${settings.accent_color}cc` : '#e8d5a3';
+  const pending = reservations.filter(r => r.status === 'PENDING');
+  const arranged = reservations.filter(r => r.status === 'ARRANGED');
+  const recent = reservations.slice(0, 6);
 
   return (
-    <div className="min-h-screen" style={{ background: '#f2ede6' }}>
+    <div className="animate-fade-in space-y-6">
+      {/* Welcome Banner */}
+      <div className="relative overflow-hidden rounded-none" style={{ background: 'linear-gradient(135deg, #16140f 0%, #2a2318 50%, #1a1510 100%)' }}>
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 right-0 w-64 h-64 rounded-full" style={{ background: '#c9a96e', filter: 'blur(80px)', transform: 'translate(30%, -30%)' }} />
+          <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full" style={{ background: '#c9a96e', filter: 'blur(60px)', transform: 'translate(-20%, 20%)' }} />
+        </div>
+        <div className="relative px-8 py-8">
+          <p className="text-[10px] tracking-[0.5em] uppercase text-gold-400 mb-2">Concierge Portal</p>
+          <h1 className="font-display text-3xl font-light text-white mb-1">Welcome, {userName}</h1>
+          <p className="text-white/40 text-sm">{format(today, 'EEEE, d MMMM yyyy')}</p>
+        </div>
+      </div>
 
-      {/* Navigation - hide/show on scroll, not visible in services */}
-      <nav
-        className="fixed top-0 left-0 right-0 z-50 transition-all duration-500"
-        style={{
-          background: 'rgba(255,255,255,0.97)',
-          backdropFilter: 'blur(12px)',
-          boxShadow: '0 1px 20px rgba(0,0,0,0.08)',
-          transform: headerVisible ? 'translateY(0)' : 'translateY(-100%)',
-          pointerEvents: headerVisible ? 'auto' : 'none',
-        }}
-      >
-        <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
-          <div>
-            <p className="font-display text-lg tracking-[0.22em] font-light" style={{ color: primary }}>
-              RAFFLES SEYCHELLES
-            </p>
-            <p className="text-[9px] tracking-[0.45em] uppercase font-medium" style={{ color: accent }}>
-              Praslin
-            </p>
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="bg-white border border-charcoal-100 p-5">
+          <p className="text-xs tracking-widest uppercase text-charcoal-400 mb-2">Today</p>
+          <p className="text-3xl font-light text-charcoal-900">{todayItems.length}</p>
+          <p className="text-xs text-charcoal-400 mt-1">reservations</p>
+        </div>
+        <div className="bg-white border border-charcoal-100 p-5">
+          <p className="text-xs tracking-widest uppercase text-charcoal-400 mb-2">Pending</p>
+          <p className="text-3xl font-light text-amber-600">{pending.length}</p>
+          <p className="text-xs text-charcoal-400 mt-1">need attention</p>
+        </div>
+        <div className="bg-white border border-charcoal-100 p-5 col-span-2 md:col-span-1">
+          <p className="text-xs tracking-widest uppercase text-charcoal-400 mb-2">Arranged</p>
+          <p className="text-3xl font-light text-green-600">{arranged.length}</p>
+          <p className="text-xs text-charcoal-400 mt-1">confirmed</p>
+        </div>
+      </div>
+
+      {/* Today's Reservations */}
+      {todayItems.length > 0 && (
+        <div className="bg-white border border-charcoal-100">
+          <div className="px-6 py-4 border-b border-charcoal-100">
+            <h2 className="font-medium text-charcoal-900 tracking-wide flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-gold-500 inline-block" />
+              Today's Schedule
+            </h2>
           </div>
-          <a
-            href="#services"
-            className="text-[10px] tracking-[0.35em] uppercase transition-colors hover:opacity-70"
-            style={{ color: primary }}
-          >
-            Our Services
-          </a>
-        </div>
-      </nav>
-
-      {/* Hero */}
-      <section ref={heroRef} className="relative h-screen flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0">
-          <img
-            src={settings.hero_image || 'https://images.unsplash.com/photo-1573843981267-be1999ff37cd?w=1920&q=90'}
-            alt="Raffles Seychelles"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(10,8,5,0.3) 0%, rgba(10,8,5,0.08) 40%, rgba(10,8,5,0.55) 100%)' }} />
-        </div>
-        <div className="relative text-center text-white px-6 animate-fade-in">
-          <p className="text-[10px] tracking-[0.65em] uppercase mb-8 font-light" style={{ color: accentLight }}>
-            Concierge Services
-          </p>
-          <h1 className="font-display font-light mb-7" style={{ fontSize: 'clamp(3rem, 7.5vw, 6rem)', lineHeight: 1.05, letterSpacing: '0.06em' }}>
-            {settings.site_title || 'Raffles Seychelles'}
-          </h1>
-          <div className="flex items-center justify-center gap-5 mb-8">
-            <div style={{ height: '1px', width: '50px', background: `linear-gradient(to right, transparent, ${accent})` }} />
-            <div style={{ width: '5px', height: '5px', background: accent, transform: 'rotate(45deg)', flexShrink: 0 }} />
-            <div style={{ height: '1px', width: '50px', background: `linear-gradient(to left, transparent, ${accent})` }} />
+          <div className="divide-y divide-charcoal-50">
+            {todayItems.map(r => (
+              <Link key={r.id} href={`/dashboard/reservations/${r.id}`} className="flex items-center gap-4 px-6 py-4 hover:bg-charcoal-50 transition-colors">
+                <div className="text-center w-12 flex-shrink-0">
+                  <p className="text-sm font-medium text-charcoal-900">
+                    {format(new Date(r.dateTime), 'HH:mm')}
+                  </p>
+                </div>
+                <div className="w-px h-8 bg-charcoal-100 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-charcoal-900 truncate">{r.guestName}</p>
+                  <p className="text-xs text-charcoal-400 truncate">{r.service?.name}</p>
+                </div>
+                <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${statusColors[r.status]}`}>
+                  {r.status}
+                </span>
+              </Link>
+            ))}
           </div>
-          <p className="font-light tracking-wider text-white/70" style={{ fontSize: '1.05rem', maxWidth: '460px', margin: '0 auto 3.5rem', lineHeight: 1.9 }}>
-            {settings.site_subtitle || 'Every experience, thoughtfully arranged for you'}
-          </p>
-          <a
-            href="#services"
-            className="inline-block text-[10px] tracking-[0.45em] uppercase transition-all duration-300 hover:bg-white hover:text-charcoal-900"
-            style={{ border: '1px solid rgba(255,255,255,0.5)', color: 'white', padding: '15px 50px' }}
-          >
-            Discover
-          </a>
         </div>
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-          <p className="text-white/30 text-[9px] tracking-[0.5em] uppercase">Scroll</p>
-          <div className="w-px h-14 bg-gradient-to-b from-white/30 to-transparent" />
-        </div>
-      </section>
+      )}
 
-      {/* Intro band */}
-      <section className="py-28 px-6 text-center bg-white">
-        <p className="text-[10px] tracking-[0.55em] uppercase mb-6 font-medium" style={{ color: accent }}>Curated For You</p>
-        <h2 className="font-display font-light mb-7" style={{ fontSize: 'clamp(2.1rem, 4vw, 3rem)', color: primary, letterSpacing: '0.04em' }}>
-          Extraordinary Experiences
-        </h2>
-        <div className="flex items-center justify-center gap-5 mb-9">
-          <div style={{ height: '1px', width: '40px', background: `linear-gradient(to right, transparent, ${accent})` }} />
-          <div style={{ width: '4px', height: '4px', background: accent, transform: 'rotate(45deg)', flexShrink: 0 }} />
-          <div style={{ height: '1px', width: '40px', background: `linear-gradient(to left, transparent, ${accent})` }} />
+      {/* All recent reservations */}
+      <div className="bg-white border border-charcoal-100">
+        <div className="px-6 py-4 border-b border-charcoal-100 flex items-center justify-between">
+          <h2 className="font-medium text-charcoal-900 tracking-wide">Recent Reservations</h2>
+          <Link href="/dashboard/reservations" className="text-xs tracking-widest uppercase text-gold-500 hover:text-gold-600">
+            View All →
+          </Link>
         </div>
-        <p className="mx-auto" style={{ color: '#aaa', maxWidth: '520px', lineHeight: 2.1, fontSize: '0.875rem' }}>
-          From private island excursions to seamless helicopter transfers and championship golf,
-          our concierge team curates every detail of your Seychelles stay with quiet precision.
-        </p>
-      </section>
-
-      {/* Services Grid */}
-      <section ref={servicesRef} id="services" className="py-24 px-6" style={{ background: '#f2ede6' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-[10px] tracking-[0.55em] uppercase mb-4 font-medium" style={{ color: accent }}>Explore</p>
-            <h2 className="font-display font-light" style={{ fontSize: '2.1rem', color: primary, letterSpacing: '0.04em' }}>Our Services</h2>
+        {loading ? (
+          <div className="p-8 text-center text-charcoal-400 text-sm">Loading…</div>
+        ) : recent.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-charcoal-400 text-sm mb-4">No reservations yet.</p>
+            <Link href="/dashboard/reservations" className="btn-primary text-xs">
+              + Create First Reservation
+            </Link>
           </div>
-
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0.5">
-              {[...Array(6)].map((_, i) => <div key={i} className="h-80 animate-pulse" style={{ background: '#e0d8cc' }} />)}
-            </div>
-          ) : (
-            <div className={`grid gap-0.5 ${settings.layout_style === 'list' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
-              {categories.map((cat, idx) => (
-                <Link
-                  key={cat.id}
-                  href={`/services/${cat.slug}`}
-                  className="group relative overflow-hidden block"
-                  style={{ height: idx === 0 ? '420px' : '340px' }}
-                >
-                  {/* Carousel of category images */}
-                  <CategoryCarousel slug={cat.slug} categoryName={cat.name} />
-
-                  <div className="absolute inset-0 transition-opacity duration-500" style={{ background: 'linear-gradient(to top, rgba(8,6,3,0.85) 0%, rgba(8,6,3,0.05) 55%, transparent 100%)' }} />
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: 'rgba(8,6,3,0.2)' }} />
-                  <div className="absolute top-0 left-0 right-0 h-0.5 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500" style={{ background: accent }} />
-
-                  <div className="absolute inset-0 flex flex-col justify-end p-8 pb-9">
-                    <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-400 ease-out">
-                      <p className="text-[9px] tracking-[0.5em] uppercase mb-2.5 font-medium" style={{ color: accent }}>
-                        {CATEGORY_LABEL[cat.slug] || 'Experience'}
-                      </p>
-                      <h3 className="font-display font-light text-white mb-5" style={{ fontSize: '1.6rem', letterSpacing: '0.04em', lineHeight: 1.2 }}>
-                        {cat.name}
-                      </h3>
-                      <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">
-                        <div style={{ height: '1px', width: '22px', background: accent }} />
-                        <span className="text-[9px] tracking-[0.45em] uppercase" style={{ color: accent }}>Explore</span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Concierge strip - improved readability */}
-      <section className="relative py-28 px-6 text-center overflow-hidden">
-        {/* Background with blur overlay */}
-        <div className="absolute inset-0">
-          <img
-            src="https://images.unsplash.com/photo-1439130490301-25e322d88054?w=1920&q=80"
-            alt=""
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0" style={{ background: 'rgba(10, 8, 5, 0.72)', backdropFilter: 'blur(2px)' }} />
-        </div>
-        <div className="relative max-w-2xl mx-auto">
-          <p className="text-[10px] tracking-[0.55em] uppercase mb-5 font-medium" style={{ color: accent }}>Always Available</p>
-          <h2 className="font-display font-light mb-7 text-white" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', letterSpacing: '0.04em' }}>
-            Your Personal Concierge
-          </h2>
-          <div className="flex items-center justify-center gap-5 mb-8">
-            <div style={{ height: '1px', width: '40px', background: `linear-gradient(to right, transparent, ${accent})` }} />
-            <div style={{ width: '4px', height: '4px', background: accent, transform: 'rotate(45deg)', flexShrink: 0 }} />
-            <div style={{ height: '1px', width: '40px', background: `linear-gradient(to left, transparent, ${accent})` }} />
+        ) : (
+          <div className="divide-y divide-charcoal-50">
+            {recent.map(r => (
+              <Link key={r.id} href={`/dashboard/reservations/${r.id}`} className="flex items-center gap-4 px-6 py-3.5 hover:bg-charcoal-50 transition-colors">
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot[r.status] || 'bg-charcoal-300'}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-charcoal-900 truncate">{r.guestName}</p>
+                  <p className="text-xs text-charcoal-400 truncate">{r.service?.name}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-xs text-charcoal-500 mb-0.5">{format(new Date(r.dateTime), 'dd MMM')}</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColors[r.status]}`}>
+                    {r.status}
+                  </span>
+                </div>
+              </Link>
+            ))}
           </div>
-          <p style={{ color: 'rgba(255,255,255,0.75)', lineHeight: 2.1, fontSize: '0.9rem', marginBottom: '2.5rem' }}>
-            Our team is available around the clock to arrange any experience, transfer or activity during your stay at Raffles Praslin Seychelles.
-          </p>
-          <p className="text-[10px] tracking-[0.5em] uppercase" style={{ color: accent, opacity: 0.8 }}>
-            Anse Takamaka · Praslin · Seychelles
-          </p>
-        </div>
-      </section>
-
-      {/* Footer - brighter */}
-      <footer style={{ background: '#2c2820', borderTop: `1px solid ${accent}33` }} className="py-12 text-center">
-        <p className="font-display font-light tracking-[0.3em] mb-3" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.95rem' }}>
-          RAFFLES SEYCHELLES · PRASLIN
-        </p>
-        <div className="flex items-center justify-center gap-5 mb-5">
-          <div style={{ height: '1px', width: '30px', background: `linear-gradient(to right, transparent, ${accent}88)` }} />
-          <div style={{ width: '3px', height: '3px', background: accent, transform: 'rotate(45deg)', opacity: 0.6 }} />
-          <div style={{ height: '1px', width: '30px', background: `linear-gradient(to left, transparent, ${accent}88)` }} />
-        </div>
-        <p className="text-xs mb-2" style={{ color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>
-          Anse Takamaka, Praslin Island, Seychelles
-        </p>
-        <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.25)', letterSpacing: '0.12em' }}>
-          © {new Date().getFullYear()} Raffles Hotels & Resorts. All rights reserved.
-        </p>
-      </footer>
+        )}
+      </div>
     </div>
   );
+}
+
+// ─── Main Export ──────────────────────────────────────────────────────────────
+export default function DashboardPage() {
+  const { user } = useAuth();
+
+  if (!user) return null;
+
+  if (user.role === 'ADMIN') return <AdminDashboard />;
+  return <ConciergeDashboard userName={user.name} />;
 }
