@@ -8,14 +8,23 @@ export class MediaService {
   constructor(private prisma: PrismaService) {}
 
   async addImages(serviceId: string, files: Express.Multer.File[]) {
-    const existing = await this.prisma.service.findUnique({ where: { id: serviceId } });
+    const existing = await this.prisma.service.findUnique({
+      where: { id: serviceId },
+      // FIX 4: Fetch existing image count so new sortOrder values continue
+      // from where the last batch left off, avoiding collisions at index 0
+      include: { images: { select: { sortOrder: true }, orderBy: { sortOrder: 'desc' }, take: 1 } },
+    });
     if (!existing) throw new NotFoundException('Service not found');
+
+    const nextSortOrder = existing.images.length > 0
+      ? existing.images[0].sortOrder + 1
+      : 0;
 
     const images = files.map((f, i) => ({
       serviceId,
       url: `/uploads/${f.filename}`,
       alt: existing.name,
-      sortOrder: i,
+      sortOrder: nextSortOrder + i,
     }));
 
     return this.prisma.serviceImage.createMany({ data: images });
