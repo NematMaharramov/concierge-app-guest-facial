@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useInactivityLogout } from '@/lib/useInactivityLogout';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊', exact: true },
@@ -18,6 +19,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Auto-logout after 10 minutes of inactivity
+  useInactivityLogout(logout, !!user && !loading);
 
   useEffect(() => {
     if (!loading && !user) router.push('/login');
