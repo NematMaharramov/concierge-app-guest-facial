@@ -17,6 +17,7 @@ enum ReservationStatus {
   ARRANGED
   NOT_ARRANGED
   CANCELLED
+  COMPLETED
 }
 
 model User {
