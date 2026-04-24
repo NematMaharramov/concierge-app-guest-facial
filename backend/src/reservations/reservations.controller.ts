@@ -11,8 +11,9 @@ export class ReservationsController {
   stats() { return this.reservationsService.getStats(); }
 
   @Get()
-  findAll(@Request() req: any) {
-    return this.reservationsService.findAll(req.user.id, req.user.role);
+  findAll() {
+    // All authenticated users see ALL reservations
+    return this.reservationsService.findAll();
   }
 
   @Get(':id')
