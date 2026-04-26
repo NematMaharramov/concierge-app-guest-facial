@@ -130,15 +130,21 @@ async function main() {
   ]});
 
   // ── Site Settings ────────────────────────────────────────────────
+  // Using upsert so re-running seed doesn't duplicate rows.
+  // FIX: site_title changed from 'Raffles Praslin' → 'Raffles Seychelles'
   for (const s of [
-    { key: 'site_title', value: 'Raffles Praslin' },
+    { key: 'site_title',    value: 'Raffles Seychelles' },
     { key: 'site_subtitle', value: 'Every experience, thoughtfully arranged for you' },
-    { key: 'hero_image', value: '' },
-    { key: 'layout_style', value: 'grid' },
+    { key: 'hero_image',    value: '' },
+    { key: 'layout_style',  value: 'grid' },
     { key: 'primary_color', value: '#1a1a1a' },
-    { key: 'accent_color', value: '#c9a96e' },
+    { key: 'accent_color',  value: '#c9a96e' },
   ]) {
-    await prisma.siteSettings.create({ data: s });
+    await prisma.siteSettings.upsert({
+      where: { key: s.key },
+      update: { value: s.value },
+      create: s,
+    });
   }
 
   console.log('✅ Seed complete. Admin: admin@raffles-concierge.com / Admin@2024!');
