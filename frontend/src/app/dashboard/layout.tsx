@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useInactivityLogout } from '@/lib/useInactivityLogout';
+import { getUserTheme, setUserTheme } from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -61,17 +62,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Theme defaults to 'dark'; loads from DB once user is available
   const [theme, setTheme] = useState<SidebarTheme>('dark');
+  const [themeLoaded, setThemeLoaded] = useState(false);
 
+  // Load theme from DB when user is ready
   useEffect(() => {
-    const saved = localStorage.getItem('sidebar-theme') as SidebarTheme | null;
-    if (saved === 'light' || saved === 'dark') setTheme(saved);
-  }, []);
+    if (!user) return;
+    getUserTheme()
+      .then(t => {
+        if (t === 'light' || t === 'dark') setTheme(t);
+      })
+      .catch(() => {/* keep default */})
+      .finally(() => setThemeLoaded(true));
+  }, [user?.id]);
 
-  const toggleTheme = () => {
+  const toggleTheme = async () => {
     const next: SidebarTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    localStorage.setItem('sidebar-theme', next);
+    setTheme(next); // optimistic
+    try {
+      await setUserTheme(next);
+    } catch {
+      // revert on failure
+      setTheme(theme);
+    }
   };
 
   useInactivityLogout(logout, !!user && !loading);
@@ -111,11 +125,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <p className={`font-display text-xl font-light tracking-widest ${t.text}`}>RAFFLES</p>
             <p className={`text-[10px] tracking-[0.3em] uppercase mt-0.5 ${t.subtext}`}>Concierge System</p>
           </div>
-          {/* Theme toggle */}
+          {/* Theme toggle — saves to DB, per-user */}
           <button
             onClick={toggleTheme}
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} sidebar`}
             className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors text-sm ${t.toggleBg} ${t.toggleText}`}
+            disabled={!themeLoaded}
           >
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
@@ -142,7 +157,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Footer */}
         <div className={`p-4 border-t ${t.border} space-y-1`}>
-          {/* Account settings link */}
           <Link
             href="/dashboard/account"
             onClick={() => setSidebarOpen(false)}
@@ -152,7 +166,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 : `${t.logoutText} ${t.hover} ${t.hoverText} border-l-2 border-transparent`
               }`}
           >
-            {/* Profile photo or initials */}
             <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 bg-charcoal-600 flex items-center justify-center">
               {profilePhotoUrl ? (
                 <img src={profilePhotoUrl} alt="" className="w-full h-full object-cover" />
