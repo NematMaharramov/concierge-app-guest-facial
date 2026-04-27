@@ -1,9 +1,17 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { getAllCategories, createCategory, updateCategory, deleteCategory } from '@/lib/api';
+import { getAllCategories, createCategory, updateCategory, deleteCategory, uploadCategoryPhoto } from '@/lib/api';
+import { ImageUploadButton } from '@/components/ImageUploadButton';
+import { CROP_PRESETS } from '@/lib/imageUtils';
 import toast from 'react-hot-toast';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 const emptyForm = { name: '', slug: '', description: '', icon: '', sortOrder: 0, isVisible: true };
+
+function resolveUrl(url?: string) {
+  if (!url) return undefined;
+  return url.startsWith('http') ? url : `${API_BASE}${url}`;
+}
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<any[]>([]);
@@ -12,26 +20,43 @@ export default function AdminCategoriesPage() {
   const [selected, setSelected] = useState<any>(null);
   const [form, setForm] = useState<any>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
 
   const load = () => getAllCategories().then(setCategories).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
 
-  const openCreate = () => { setForm(emptyForm); setModal('create'); };
+  const openCreate = () => { setForm(emptyForm); setPendingPhoto(null); setModal('create'); };
   const openEdit = (cat: any) => {
     setSelected(cat);
     setForm({ name: cat.name, slug: cat.slug, description: cat.description || '', icon: cat.icon || '', sortOrder: cat.sortOrder, isVisible: cat.isVisible });
+    setPendingPhoto(null);
     setModal('edit');
   };
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSaving(true);
+    e.preventDefault();
+    setSaving(true);
     try {
-      if (modal === 'create') await createCategory({ ...form, sortOrder: Number(form.sortOrder) });
-      else await updateCategory(selected.id, { ...form, sortOrder: Number(form.sortOrder) });
+      let savedId: string;
+      if (modal === 'create') {
+        const created = await createCategory({ ...form, sortOrder: Number(form.sortOrder) });
+        savedId = created.id;
+      } else {
+        await updateCategory(selected.id, { ...form, sortOrder: Number(form.sortOrder) });
+        savedId = selected.id;
+      }
+      // Upload photo after save if one was selected
+      if (pendingPhoto) {
+        await uploadCategoryPhoto(savedId, pendingPhoto);
+      }
       toast.success(modal === 'create' ? 'Category created' : 'Category updated');
-      setModal(null); load();
-    } catch { toast.error('Failed to save category'); }
-    finally { setSaving(false); }
+      setModal(null);
+      load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to save category');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -55,24 +80,33 @@ export default function AdminCategoriesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? [...Array(6)].map((_, i) => <div key={i} className="h-36 bg-charcoal-100 animate-pulse" />) :
           categories.map(cat => (
-            <div key={cat.id} className="bg-white border border-charcoal-100 p-5 flex flex-col gap-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-2xl mb-1">{cat.icon || '📁'}</p>
-                  <h3 className="font-medium text-charcoal-900">{cat.name}</h3>
-                  <p className="text-xs text-charcoal-400 mt-0.5">/{cat.slug}</p>
+            <div key={cat.id} className="bg-white border border-charcoal-100 overflow-hidden flex flex-col">
+              {/* Category photo thumbnail */}
+              {cat.photo && (
+                <div className="h-32 overflow-hidden bg-charcoal-100">
+                  <img src={resolveUrl(cat.photo)} alt={cat.name} className="w-full h-full object-cover" />
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${cat.isVisible ? 'bg-green-100 text-green-700' : 'bg-charcoal-100 text-charcoal-500'}`}>
-                    {cat.isVisible ? 'Visible' : 'Hidden'}
-                  </span>
-                  <span className="text-[10px] text-charcoal-400">{cat._count?.services || 0} services</span>
+              )}
+              <div className="p-5 flex flex-col gap-3 flex-1">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-2xl mb-1">{cat.icon || '📁'}</p>
+                    <h3 className="font-medium text-charcoal-900">{cat.name}</h3>
+                    <p className="text-xs text-charcoal-400 mt-0.5">/{cat.slug}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${cat.isVisible ? 'bg-green-100 text-green-700' : 'bg-charcoal-100 text-charcoal-500'}`}>
+                      {cat.isVisible ? 'Visible' : 'Hidden'}
+                    </span>
+                    <span className="text-[10px] text-charcoal-400">{cat._count?.services || 0} services</span>
+                    {cat.photo && <span className="text-[10px] text-blue-500">Has photo</span>}
+                  </div>
                 </div>
-              </div>
-              {cat.description && <p className="text-xs text-charcoal-500 leading-relaxed line-clamp-2">{cat.description}</p>}
-              <div className="flex gap-3 pt-1 border-t border-charcoal-50">
-                <button onClick={() => openEdit(cat)} className="text-gold-500 hover:text-gold-600 text-xs tracking-widest uppercase">Edit</button>
-                <button onClick={() => handleDelete(cat.id)} className="text-red-400 hover:text-red-600 text-xs tracking-widest uppercase">Delete</button>
+                {cat.description && <p className="text-xs text-charcoal-500 leading-relaxed line-clamp-2">{cat.description}</p>}
+                <div className="flex gap-3 pt-1 border-t border-charcoal-50 mt-auto">
+                  <button onClick={() => openEdit(cat)} className="text-gold-500 hover:text-gold-600 text-xs tracking-widest uppercase">Edit</button>
+                  <button onClick={() => handleDelete(cat.id)} className="text-red-400 hover:text-red-600 text-xs tracking-widest uppercase">Delete</button>
+                </div>
               </div>
             </div>
           ))
@@ -81,13 +115,26 @@ export default function AdminCategoriesPage() {
 
       {/* Modal */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setModal(null)}>
-          <div className="bg-white w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onMouseDown={e => { if (e.target === e.currentTarget) setModal(null); }}>
+          <div className="bg-white w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
+            onMouseDown={e => e.stopPropagation()}>
             <div className="px-6 py-5 border-b border-charcoal-100 flex items-center justify-between">
               <h2 className="font-display text-2xl font-light text-charcoal-900">{modal === 'create' ? 'New Category' : 'Edit Category'}</h2>
               <button onClick={() => setModal(null)} className="text-charcoal-400 hover:text-charcoal-900">✕</button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
+              {/* Category Photo Upload */}
+              <div>
+                <label className="label">Category Photo <span className="text-charcoal-400 normal-case tracking-normal font-normal">(shown on guest site)</span></label>
+                <ImageUploadButton
+                  label="Category Photo"
+                  currentUrl={modal === 'edit' ? selected?.photo : undefined}
+                  cropOptions={CROP_PRESETS.categoryPhoto}
+                  onFile={(file) => setPendingPhoto(file)}
+                />
+              </div>
+
               <div className="grid grid-cols-4 gap-3">
                 <div>
                   <label className="label">Icon</label>
