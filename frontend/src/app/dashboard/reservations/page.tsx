@@ -6,16 +6,17 @@ import { format, parse, isValid } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useModalScrollLock } from '@/lib/useModalScrollLock';
 
+// ── Date / Time parsing helpers ──────────────────────────────────────────────
 function parseSmartDate(raw: string): string {
   const digits = raw.replace(/\D/g, '');
   if (digits.length === 6) {
-    const dd = digits.slice(0, 2); const mm = digits.slice(2, 4); const yy = digits.slice(4, 6);
+    const dd = digits.slice(0, 2), mm = digits.slice(2, 4), yy = digits.slice(4, 6);
     const year = parseInt(yy, 10) >= 50 ? `19${yy}` : `20${yy}`;
     const d = parse(`${dd}/${mm}/${year}`, 'dd/MM/yyyy', new Date());
     if (isValid(d)) return format(d, 'yyyy-MM-dd');
   }
   if (digits.length === 8) {
-    const dd = digits.slice(0, 2); const mm = digits.slice(2, 4); const yyyy = digits.slice(4, 8);
+    const dd = digits.slice(0, 2), mm = digits.slice(2, 4), yyyy = digits.slice(4, 8);
     const d = parse(`${dd}/${mm}/${yyyy}`, 'dd/MM/yyyy', new Date());
     if (isValid(d)) return format(d, 'yyyy-MM-dd');
   }
@@ -26,6 +27,7 @@ function parseSmartTime(raw: string): string {
   const trimmed = raw.trim();
   if (/^\d{1,2}:\d{2}$/.test(trimmed)) return trimmed.padStart(5, '0');
   const digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 1 || digits.length === 2) return `${digits.padStart(2, '0')}:00`;
   if (digits.length === 3) return `0${digits[0]}:${digits.slice(1)}`;
   if (digits.length === 4) return `${digits.slice(0, 2)}:${digits.slice(2)}`;
   return raw;
@@ -68,21 +70,23 @@ const actionColors: Record<string, string> = {
   CREATE: 'text-green-600', UPDATE: 'text-blue-600', DELETE: 'text-red-500',
 };
 
-function SafeModal({ onClose, children, className = '' }: { onClose: () => void; children: React.ReactNode; className?: string }) {
+// ── Safe modal backdrop (only closes on clean click on backdrop) ─────────────
+function SafeModal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const mouseDownOnBackdrop = useRef(false);
   return (
     <div
       ref={backdropRef}
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm ${className}`}
-      onMouseDown={(e) => { mouseDownOnBackdrop.current = e.target === backdropRef.current; }}
-      onMouseUp={(e) => { if (mouseDownOnBackdrop.current && e.target === backdropRef.current) onClose(); mouseDownOnBackdrop.current = false; }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onMouseDown={e => { mouseDownOnBackdrop.current = e.target === backdropRef.current; }}
+      onMouseUp={e => { if (mouseDownOnBackdrop.current && e.target === backdropRef.current) onClose(); mouseDownOnBackdrop.current = false; }}
     >
       {children}
     </div>
   );
 }
 
+// ── Date + Time input with smart parsing ─────────────────────────────────────
 function DateTimeInput({ date, time, onDateChange, onTimeChange, required = false }: {
   date: string; time: string; onDateChange: (v: string) => void; onTimeChange: (v: string) => void; required?: boolean;
 }) {
@@ -90,33 +94,39 @@ function DateTimeInput({ date, time, onDateChange, onTimeChange, required = fals
   const [rawTime, setRawTime] = useState(time);
   useEffect(() => { setRawDate(date); }, [date]);
   useEffect(() => { setRawTime(time); }, [time]);
+
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
         <label className="label">Date <span className="text-red-400">*</span></label>
         <input type="date" required={required} value={rawDate}
-          onChange={(e) => { setRawDate(e.target.value); onDateChange(e.target.value); }}
+          onChange={e => { setRawDate(e.target.value); onDateChange(e.target.value); }}
           onBlur={() => { const p = parseSmartDate(rawDate); setRawDate(p); onDateChange(p); }}
           className="input-field" />
+        <p className="text-[10px] text-charcoal-400 mt-0.5">e.g. 110226 → 11 Feb 2026</p>
       </div>
       <div>
         <label className="label">Time <span className="text-red-400">*</span></label>
         <input type="time" required={required} value={rawTime}
-          onChange={(e) => { setRawTime(e.target.value); onTimeChange(e.target.value); }}
+          onChange={e => { setRawTime(e.target.value); onTimeChange(e.target.value); }}
           onBlur={() => { const p = parseSmartTime(rawTime); setRawTime(p); onTimeChange(p); }}
           className="input-field" />
+        <p className="text-[10px] text-charcoal-400 mt-0.5">e.g. 1525 → 15:25</p>
       </div>
     </div>
   );
 }
 
+// ── History panel ────────────────────────────────────────────────────────────
 function HistoryPanel({ reservationId, onClose }: { reservationId: string; onClose: () => void }) {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => { getAuditLogs(reservationId).then(setLogs).finally(() => setLoading(false)); }, [reservationId]);
+
   return (
     <SafeModal onClose={onClose}>
-      <div className="bg-white w-full max-w-md shadow-2xl max-h-[80vh] flex flex-col" onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-md shadow-2xl max-h-[80vh] flex flex-col"
+        onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()}>
         <div className="px-6 py-5 border-b border-charcoal-100 flex items-center justify-between flex-shrink-0">
           <h2 className="font-display text-xl font-light text-charcoal-900">Change History</h2>
           <button onClick={onClose} className="text-charcoal-400 hover:text-charcoal-900">✕</button>
@@ -136,9 +146,9 @@ function HistoryPanel({ reservationId, onClose }: { reservationId: string; onClo
                     {Object.entries(log.changes).map(([key, val]: [string, any]) => (
                       <div key={key} className="text-[10px] text-charcoal-500">
                         <span className="font-medium text-charcoal-700">{key}:</span>{' '}
-                        {val?.before !== undefined ? (
-                          <><span className="line-through text-red-400">{String(val.before ?? '—')}</span>{' → '}<span className="text-green-600">{String(val.after ?? '—')}</span></>
-                        ) : <span>{String(val ?? '—')}</span>}
+                        {val?.before !== undefined
+                          ? <><span className="line-through text-red-400">{String(val.before ?? '—')}</span>{' → '}<span className="text-green-600">{String(val.after ?? '—')}</span></>
+                          : <span>{String(val ?? '—')}</span>}
                       </div>
                     ))}
                   </div>
@@ -151,6 +161,7 @@ function HistoryPanel({ reservationId, onClose }: { reservationId: string; onClo
   );
 }
 
+// ── Reservation detail / edit modal ─────────────────────────────────────────
 function ReservationModal({ reservation, services, mode: initialMode, onClose, onSaved, onDeleted, currentUser }: {
   reservation: any; services: any[]; mode: 'view' | 'edit';
   onClose: () => void; onSaved: () => void; onDeleted: () => void; currentUser: any;
@@ -164,11 +175,22 @@ function ReservationModal({ reservation, services, mode: initialMode, onClose, o
   const [form, setForm] = useState<ReservationForm>({
     serviceId: reservation.serviceId, guestName: reservation.guestName,
     guestCount: reservation.guestCount, date: initDate, time: initTime,
-    notes: reservation.notes || '', totalPrice: reservation.totalPrice != null ? String(reservation.totalPrice) : '',
+    notes: reservation.notes || '',
+    totalPrice: reservation.totalPrice != null ? String(reservation.totalPrice) : '',
     currency: reservation.currency || 'EUR', status: reservation.status,
   });
 
   const setField = (key: keyof ReservationForm, value: any) => setForm(f => ({ ...f, [key]: value }));
+
+  // Auto-fill price when service changes in edit mode
+  const handleServiceChange = (serviceId: string) => {
+    setField('serviceId', serviceId);
+    const svc = services.find(s => s.id === serviceId);
+    if (svc?.priceAmount) {
+      setField('totalPrice', String(svc.priceAmount));
+      if (svc.priceCurrency) setField('currency', svc.priceCurrency);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,12 +212,12 @@ function ReservationModal({ reservation, services, mode: initialMode, onClose, o
     if (!confirm('Permanently delete this reservation?')) return;
     setDeleting(true);
     try { await deleteReservation(reservation.id); toast.success('Deleted'); onDeleted(); }
-    catch { toast.error('Failed to delete'); }
+    catch (err: any) { toast.error(err?.response?.data?.message || 'Failed to delete'); }
     finally { setDeleting(false); }
   };
 
-  const canDelete = currentUser?.role === 'ADMIN' || reservation.userId === currentUser?.id;
-  const canEdit = currentUser?.role === 'ADMIN' || reservation.userId === currentUser?.id;
+  // All users can edit; only admins can delete
+  const canDelete = currentUser?.role === 'ADMIN';
   const serviceName = services.find(s => s.id === reservation.serviceId)?.name || reservation.service?.name || '—';
 
   useModalScrollLock(true);
@@ -203,7 +225,10 @@ function ReservationModal({ reservation, services, mode: initialMode, onClose, o
   return (
     <>
       <SafeModal onClose={onClose}>
-        <div className="bg-white w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col" onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()}>
+        <div className="bg-white w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col"
+          onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()}>
+
+          {/* Header */}
           <div className="px-6 py-5 border-b border-charcoal-100 flex items-center justify-between flex-shrink-0">
             <div>
               <p className="text-xs tracking-[0.4em] uppercase text-gold-500 mb-0.5">Reservation</p>
@@ -215,26 +240,27 @@ function ReservationModal({ reservation, services, mode: initialMode, onClose, o
             </div>
           </div>
 
+          {/* Actions bar */}
           <div className="px-6 py-3 border-b border-charcoal-50 flex items-center gap-3 flex-shrink-0">
-            {canEdit && (
-              <button onClick={() => setMode(mode === 'edit' ? 'view' : 'edit')}
-                className={`text-xs tracking-widest uppercase transition-colors ${mode === 'edit' ? 'text-gold-600 font-semibold' : 'text-gold-500 hover:text-gold-600'}`}>
-                {mode === 'edit' ? '← View' : 'Edit'}
-              </button>
-            )}
-            {canEdit && <span className="text-charcoal-200">|</span>}
+            <button onClick={() => setMode(mode === 'edit' ? 'view' : 'edit')}
+              className={`text-xs tracking-widest uppercase transition-colors ${mode === 'edit' ? 'text-gold-600 font-semibold' : 'text-gold-500 hover:text-gold-600'}`}>
+              {mode === 'edit' ? '← View' : 'Edit'}
+            </button>
+            <span className="text-charcoal-200">|</span>
             <button onClick={() => setShowHistory(true)} className="text-xs tracking-widest uppercase text-charcoal-400 hover:text-charcoal-900 transition-colors">History</button>
             {canDelete && (
               <><span className="text-charcoal-200">|</span>
                 <button onClick={handleDelete} disabled={deleting} className="text-xs tracking-widest uppercase text-red-400 hover:text-red-600 transition-colors">
                   {deleting ? 'Deleting…' : 'Delete'}
-                </button></>
+                </button>
+              </>
             )}
           </div>
 
+          {/* Body */}
           <div className="overflow-y-auto flex-1">
             {mode === 'view' ? (
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-1">
                 {[
                   { label: 'Service', value: serviceName },
                   { label: 'Guest Name', value: reservation.guestName },
@@ -245,7 +271,7 @@ function ReservationModal({ reservation, services, mode: initialMode, onClose, o
                   ...(reservation.notes ? [{ label: 'Notes', value: reservation.notes }] : []),
                   ...(reservation.user ? [{ label: 'Created by', value: reservation.user.name }] : []),
                 ].map(({ label, value }) => (
-                  <div key={label} className="flex justify-between gap-4 py-2 border-b border-charcoal-50 last:border-0">
+                  <div key={label} className="flex justify-between gap-4 py-2.5 border-b border-charcoal-50 last:border-0">
                     <span className="text-xs tracking-widest uppercase text-charcoal-400 flex-shrink-0">{label}</span>
                     <span className="text-sm text-charcoal-900 text-right">{value}</span>
                   </div>
@@ -255,7 +281,7 @@ function ReservationModal({ reservation, services, mode: initialMode, onClose, o
               <form id="res-edit-form" onSubmit={handleSave} className="p-6 space-y-4">
                 <div>
                   <label className="label">Service</label>
-                  <select required value={form.serviceId} onChange={e => setField('serviceId', e.target.value)} className="input-field">
+                  <select required value={form.serviceId} onChange={e => handleServiceChange(e.target.value)} className="input-field">
                     <option value="">Select a service…</option>
                     {services.map(s => <option key={s.id} value={s.id}>{s.category?.name} — {s.name}</option>)}
                   </select>
@@ -274,17 +300,14 @@ function ReservationModal({ reservation, services, mode: initialMode, onClose, o
                 <div>
                   <label className="label">Status</label>
                   <select value={form.status} onChange={e => setField('status', e.target.value)} className="input-field">
-                    <option>PENDING</option>
-                    <option>ARRANGED</option>
-                    <option>NOT_ARRANGED</option>
-                    <option>COMPLETED</option>
-                    <option>CANCELLED</option>
+                    <option>PENDING</option><option>ARRANGED</option><option>NOT_ARRANGED</option><option>COMPLETED</option><option>CANCELLED</option>
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="label">Total Price</label>
-                    <input type="number" value={form.totalPrice} onChange={e => setField('totalPrice', e.target.value)} className="input-field" placeholder="Optional" />
+                    <input type="number" value={form.totalPrice} onChange={e => setField('totalPrice', e.target.value)} className="input-field" placeholder="Auto-filled from service" />
+                    <p className="text-[10px] text-charcoal-400 mt-0.5">Adjust for discounts or supplements</p>
                   </div>
                   <div>
                     <label className="label">Currency</label>
@@ -295,7 +318,7 @@ function ReservationModal({ reservation, services, mode: initialMode, onClose, o
                 </div>
                 <div>
                   <label className="label">Notes</label>
-                  <textarea rows={3} value={form.notes} onChange={e => setField('notes', e.target.value)} className="input-field resize-none" />
+                  <textarea rows={3} value={form.notes} onChange={e => setField('notes', e.target.value)} className="input-field resize-none" placeholder="Discount reason, supplement, special requests…" />
                 </div>
               </form>
             )}
@@ -314,10 +337,20 @@ function ReservationModal({ reservation, services, mode: initialMode, onClose, o
   );
 }
 
+// ── New reservation modal ────────────────────────────────────────────────────
 function NewReservationModal({ services, onClose, onCreated }: { services: any[]; onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState<ReservationForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const setField = (key: keyof ReservationForm, value: any) => setForm(f => ({ ...f, [key]: value }));
+
+  const handleServiceChange = (serviceId: string) => {
+    setField('serviceId', serviceId);
+    const svc = services.find(s => s.id === serviceId);
+    if (svc?.priceAmount) {
+      setField('totalPrice', String(svc.priceAmount));
+      if (svc.priceCurrency) setField('currency', svc.priceCurrency);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -338,7 +371,8 @@ function NewReservationModal({ services, onClose, onCreated }: { services: any[]
 
   return (
     <SafeModal onClose={onClose}>
-      <div className="bg-white w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col" onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col"
+        onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()}>
         <div className="px-6 py-5 border-b border-charcoal-100 flex items-center justify-between flex-shrink-0">
           <h2 className="font-display text-2xl font-light text-charcoal-900">New Reservation</h2>
           <button onClick={onClose} className="text-charcoal-400 hover:text-charcoal-900">✕</button>
@@ -347,7 +381,7 @@ function NewReservationModal({ services, onClose, onCreated }: { services: any[]
           <form id="new-res-form" onSubmit={handleCreate} className="p-6 space-y-4">
             <div>
               <label className="label">Service</label>
-              <select required value={form.serviceId} onChange={e => setField('serviceId', e.target.value)} className="input-field">
+              <select required value={form.serviceId} onChange={e => handleServiceChange(e.target.value)} className="input-field">
                 <option value="">Select a service…</option>
                 {services.map(s => <option key={s.id} value={s.id}>{s.category?.name} — {s.name}</option>)}
               </select>
@@ -366,7 +400,8 @@ function NewReservationModal({ services, onClose, onCreated }: { services: any[]
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="label">Total Price</label>
-                <input type="number" value={form.totalPrice} onChange={e => setField('totalPrice', e.target.value)} className="input-field" placeholder="Optional" />
+                <input type="number" value={form.totalPrice} onChange={e => setField('totalPrice', e.target.value)} className="input-field" placeholder="Auto-filled from service" />
+                <p className="text-[10px] text-charcoal-400 mt-0.5">Adjust for discounts or supplements</p>
               </div>
               <div>
                 <label className="label">Currency</label>
@@ -377,7 +412,7 @@ function NewReservationModal({ services, onClose, onCreated }: { services: any[]
             </div>
             <div>
               <label className="label">Notes</label>
-              <textarea rows={3} value={form.notes} onChange={e => setField('notes', e.target.value)} className="input-field resize-none" placeholder="Special requests, details…" />
+              <textarea rows={3} value={form.notes} onChange={e => setField('notes', e.target.value)} className="input-field resize-none" placeholder="Discount reason, supplement, special requests…" />
             </div>
           </form>
         </div>
@@ -390,15 +425,17 @@ function NewReservationModal({ services, onClose, onCreated }: { services: any[]
   );
 }
 
+// ── Main page ────────────────────────────────────────────────────────────────
 export default function ReservationsPage() {
   const { user } = useAuth();
   const [reservations, setReservations] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
-  const [filter, setFilter] = useState('ALL');
+  const [filter, setFilter] = useState('ACTIVE');
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState<any>(null);
   const [selectedMode, setSelectedMode] = useState<'view' | 'edit'>('view');
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const load = useCallback(async () => {
     try { const data = await getReservations(); setReservations(data); }
@@ -415,9 +452,54 @@ export default function ReservationsPage() {
   const openView = (r: any) => { setSelected(r); setSelectedMode('view'); };
   const openEdit = (r: any, e: React.MouseEvent) => { e.stopPropagation(); setSelected(r); setSelectedMode('edit'); };
 
-  const filtered = filter === 'ALL' ? reservations : reservations.filter(r => r.status === filter);
+  // Split into active and completed
+  const activeReservations = reservations.filter(r => r.status !== 'COMPLETED');
+  const completedReservations = reservations.filter(r => r.status === 'COMPLETED');
 
-  const filterButtons = ['ALL', 'PENDING', 'ARRANGED', 'NOT_ARRANGED', 'COMPLETED', 'CANCELLED'];
+  const ACTIVE_FILTERS = ['ACTIVE', 'PENDING', 'ARRANGED', 'NOT_ARRANGED', 'CANCELLED'];
+
+  const filtered = filter === 'ACTIVE'
+    ? activeReservations
+    : activeReservations.filter(r => r.status === filter);
+
+  const ReservationTable = ({ rows, emptyMsg }: { rows: any[]; emptyMsg: string }) => (
+    <div className="bg-white border border-charcoal-100 overflow-hidden">
+      {rows.length === 0 ? (
+        <div className="p-12 text-center text-charcoal-400">{emptyMsg}</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-charcoal-50 border-b border-charcoal-100">
+              <tr>
+                {['Guest', 'Service', 'Date & Time', 'Guests', 'Status', 'Staff', ''].map(h => (
+                  <th key={h} className="text-left px-5 py-3 text-xs tracking-widest uppercase text-charcoal-500 font-medium">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-charcoal-50">
+              {rows.map(r => (
+                <tr key={r.id} className="hover:bg-charcoal-50/50 transition-colors cursor-pointer select-none" onDoubleClick={() => openView(r)}>
+                  <td className="px-5 py-4 font-medium text-charcoal-900">{r.guestName}</td>
+                  <td className="px-5 py-4 text-charcoal-600 max-w-[180px] truncate">{r.service?.name}</td>
+                  <td className="px-5 py-4 text-charcoal-600 whitespace-nowrap">
+                    {isValid(new Date(r.dateTime)) ? format(new Date(r.dateTime), 'dd MMM yyyy HH:mm') : r.dateTime}
+                  </td>
+                  <td className="px-5 py-4 text-charcoal-600">{r.guestCount}</td>
+                  <td className="px-5 py-4">
+                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${statusColors[r.status]}`}>{r.status}</span>
+                  </td>
+                  <td className="px-5 py-4 text-charcoal-500 text-xs">{r.user?.name}</td>
+                  <td className="px-5 py-4">
+                    <button onClick={e => openEdit(r, e)} className="text-gold-500 hover:text-gold-600 text-xs tracking-widest uppercase">Edit</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -429,60 +511,46 @@ export default function ReservationsPage() {
         <button onClick={() => setShowNew(true)} className="btn-primary">+ New Reservation</button>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        {filterButtons.map(s => (
-          <button key={s} onClick={() => setFilter(s)}
-            className={`px-4 py-1.5 text-xs tracking-widest uppercase transition-colors ${filter === s ? 'bg-charcoal-900 text-white' : 'bg-white border border-charcoal-200 text-charcoal-600 hover:bg-charcoal-50'}`}>
-            {s.replace('_', ' ')}
-          </button>
-        ))}
+      {/* Active reservations section */}
+      <div className="space-y-4">
+        <div className="flex gap-2 flex-wrap">
+          {ACTIVE_FILTERS.map(s => (
+            <button key={s} onClick={() => setFilter(s)}
+              className={`px-4 py-1.5 text-xs tracking-widest uppercase transition-colors ${filter === s ? 'bg-charcoal-900 text-white' : 'bg-white border border-charcoal-200 text-charcoal-600 hover:bg-charcoal-50'}`}>
+              {s === 'ACTIVE' ? `All Active (${activeReservations.length})` : s.replace('_', ' ')}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="bg-white border border-charcoal-100 p-12 text-center text-charcoal-400">Loading…</div>
+        ) : (
+          <ReservationTable rows={filtered} emptyMsg="No reservations found." />
+        )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-charcoal-100 overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center text-charcoal-400">Loading…</div>
-        ) : filtered.length === 0 ? (
-          <div className="p-12 text-center text-charcoal-400">No reservations found.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-charcoal-50 border-b border-charcoal-100">
-                <tr>
-                  {['Guest', 'Service', 'Date & Time', 'Guests', 'Status', 'Staff', ''].map(h => (
-                    <th key={h} className="text-left px-5 py-3 text-xs tracking-widest uppercase text-charcoal-500 font-medium">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-charcoal-50">
-                {filtered.map(r => (
-                  <tr key={r.id} className="hover:bg-charcoal-50/50 transition-colors cursor-pointer select-none" onDoubleClick={() => openView(r)}>
-                    <td className="px-5 py-4 font-medium text-charcoal-900">{r.guestName}</td>
-                    <td className="px-5 py-4 text-charcoal-600 max-w-[180px] truncate">{r.service?.name}</td>
-                    <td className="px-5 py-4 text-charcoal-600 whitespace-nowrap">
-                      {isValid(new Date(r.dateTime)) ? format(new Date(r.dateTime), 'dd MMM yyyy HH:mm') : r.dateTime}
-                    </td>
-                    <td className="px-5 py-4 text-charcoal-600">{r.guestCount}</td>
-                    <td className="px-5 py-4">
-                      <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${statusColors[r.status]}`}>{r.status}</span>
-                    </td>
-                    <td className="px-5 py-4 text-charcoal-500 text-xs">{r.user?.name}</td>
-                    <td className="px-5 py-4">
-                      {(user?.role === 'ADMIN' || r.userId === user?.id) && (
-                        <button onClick={e => openEdit(r, e)} className="text-gold-500 hover:text-gold-600 text-xs tracking-widest uppercase">Edit</button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Completed reservations — collapsible */}
+      <div className="border border-charcoal-100 bg-white">
+        <button
+          onClick={() => setShowCompleted(v => !v)}
+          className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-charcoal-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xs tracking-widest uppercase text-charcoal-500 font-medium">Completed Reservations</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">{completedReservations.length}</span>
+          </div>
+          <span className={`text-charcoal-400 transition-transform ${showCompleted ? 'rotate-180' : ''}`}>▾</span>
+        </button>
+        {showCompleted && (
+          <div className="border-t border-charcoal-100">
+            <ReservationTable rows={completedReservations} emptyMsg="No completed reservations." />
           </div>
         )}
       </div>
 
       <p className="text-[11px] text-charcoal-400 text-center tracking-wide">
         Double-click a row to view details · Click Edit to modify
+        {user?.role !== 'ADMIN' && ' · Only admins can delete reservations'}
       </p>
 
       {showNew && <NewReservationModal services={services} onClose={() => setShowNew(false)} onCreated={load} />}
