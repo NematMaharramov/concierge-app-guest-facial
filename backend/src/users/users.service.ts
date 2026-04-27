@@ -15,6 +15,14 @@ export class UpdateUserDto {
   @IsString() @IsOptional() password?: string;
   @IsEnum(['ADMIN', 'CONCIERGE']) @IsOptional() role?: string;
   @IsOptional() isActive?: boolean;
+  @IsString() @IsOptional() profilePhoto?: string;
+}
+
+export class UpdateProfileDto {
+  @IsString() @IsOptional() name?: string;
+  @IsString() @IsOptional() currentPassword?: string;
+  @IsString() @IsOptional() newPassword?: string;
+  @IsString() @IsOptional() profilePhoto?: string;
 }
 
 @Injectable()
@@ -27,14 +35,14 @@ export class UsersService {
 
   async findAll() {
     return this.prisma.user.findMany({
-      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, isActive: true, profilePhoto: true, createdAt: true },
     });
   }
 
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, isActive: true, profilePhoto: true, createdAt: true },
     });
     if (!user) throw new NotFoundException('User not found');
     return user;
@@ -46,7 +54,7 @@ export class UsersService {
     const password = await bcrypt.hash(dto.password, 10);
     return this.prisma.user.create({
       data: { email: dto.email, password, name: dto.name, role: (dto.role as any) || 'CONCIERGE' },
-      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, isActive: true, profilePhoto: true, createdAt: true },
     });
   }
 
@@ -57,16 +65,38 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id },
       data,
-      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, isActive: true, profilePhoto: true, createdAt: true },
+    });
+  }
+
+  async updateProfile(id: string, dto: UpdateProfileDto) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const data: any = {};
+
+    if (dto.name) data.name = dto.name;
+    if (dto.profilePhoto !== undefined) data.profilePhoto = dto.profilePhoto;
+
+    if (dto.newPassword) {
+      if (!dto.currentPassword) {
+        throw new BadRequestException('Current password is required to set a new password');
+      }
+      const valid = await bcrypt.compare(dto.currentPassword, user.password);
+      if (!valid) throw new BadRequestException('Current password is incorrect');
+      data.password = await bcrypt.hash(dto.newPassword, 10);
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data,
+      select: { id: true, email: true, name: true, role: true, isActive: true, profilePhoto: true, createdAt: true },
     });
   }
 
   async remove(id: string) {
     await this.findOne(id);
 
-    // FIX 2: Check for reservations owned by this user before deleting.
-    // Deleting a user with reservations would violate the FK constraint on
-    // Reservation.userId (no cascade defined) and throw a 500 in production.
     const reservationCount = await this.prisma.reservation.count({ where: { userId: id } });
     if (reservationCount > 0) {
       throw new BadRequestException(
@@ -75,7 +105,6 @@ export class UsersService {
       );
     }
 
-    // AuditLog.userId also has no cascade, so check that too.
     const auditCount = await this.prisma.auditLog.count({ where: { userId: id } });
     if (auditCount > 0) {
       throw new BadRequestException(
