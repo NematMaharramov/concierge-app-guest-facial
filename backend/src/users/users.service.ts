@@ -94,6 +94,29 @@ export class UsersService {
     });
   }
 
+  // ── Per-user theme preference stored in SiteSettings as user_theme:{userId} ──
+  async getTheme(userId: string): Promise<string> {
+    try {
+      const row = await this.prisma.siteSettings.findUnique({
+        where: { key: `user_theme:${userId}` },
+      });
+      return row?.value || 'dark';
+    } catch {
+      return 'dark';
+    }
+  }
+
+  async setTheme(userId: string, theme: string): Promise<{ theme: string }> {
+    const validThemes = ['dark', 'light'];
+    const value = validThemes.includes(theme) ? theme : 'dark';
+    await this.prisma.siteSettings.upsert({
+      where: { key: `user_theme:${userId}` },
+      update: { value },
+      create: { key: `user_theme:${userId}`, value },
+    });
+    return { theme: value };
+  }
+
   async remove(id: string) {
     await this.findOne(id);
 
@@ -112,6 +135,11 @@ export class UsersService {
         `Deactivate the account instead to preserve the audit trail.`
       );
     }
+
+    // Clean up theme preference
+    await this.prisma.siteSettings.deleteMany({
+      where: { key: `user_theme:${id}` },
+    });
 
     return this.prisma.user.delete({ where: { id } });
   }
