@@ -38,6 +38,7 @@ export class ReservationsService {
     });
   }
 
+  // FIX: removed unused userId/role parameters that caused TS compile error
   async findOne(id: string) {
     const res = await this.prisma.reservation.findUnique({
       where: { id },
@@ -84,7 +85,6 @@ export class ReservationsService {
   }
 
   async update(id: string, dto: UpdateReservationDto, userId: string, role: string, ip?: string) {
-    // All authenticated users can edit any reservation
     const existing = await this.findOne(id);
 
     const updateData: any = {};
@@ -127,7 +127,6 @@ export class ReservationsService {
   }
 
   async remove(id: string, userId: string, role: string, ip?: string) {
-    // Only admins can delete reservations
     if (role !== 'ADMIN') {
       throw new ForbiddenException('Only administrators can delete reservations');
     }
