@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { getAllServices, getAllCategories, createService, updateService, deleteService, uploadImages, deleteImage } from '@/lib/api';
+import { useEffect, useState, useRef } from 'react';
+import { api, getAllServices, getAllCategories, createService, updateService, deleteService, deleteImage } from '@/lib/api';
+import { cropAndResize, CROP_PRESETS } from '@/lib/imageUtils';
 import toast from 'react-hot-toast';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
 const emptyForm = { categoryId: '', name: '', description: '', priceInfo: '', priceAmount: '', priceCurrency: 'EUR', contactName: '', contactPhone: '', sortOrder: 0, isVisible: true };
 
 export default function AdminServicesPage() {
@@ -16,8 +16,10 @@ export default function AdminServicesPage() {
   const [form, setForm] = useState<any>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [filterCat, setFilterCat] = useState('ALL');
-  const [uploadingFiles, setUploadingFiles] = useState<FileList | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadQueue, setUploadQueue] = useState<File[]>([]);
+  const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = () => Promise.all([getAllServices(), getAllCategories()]).then(([svcs, cats]) => {
     setServices(svcs); setCategories(cats);
@@ -31,7 +33,12 @@ export default function AdminServicesPage() {
     setForm({ categoryId: svc.categoryId, name: svc.name, description: svc.description || '', priceInfo: svc.priceInfo || '', priceAmount: svc.priceAmount || '', priceCurrency: svc.priceCurrency || 'EUR', contactName: svc.contactName || '', contactPhone: svc.contactPhone || '', sortOrder: svc.sortOrder, isVisible: svc.isVisible });
     setModal('edit');
   };
-  const openImages = (svc: any) => { setSelected(svc); setModal('images'); };
+  const openImages = (svc: any) => {
+    setSelected(svc);
+    setUploadQueue([]);
+    setUploadPreviews([]);
+    setModal('images');
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
@@ -41,8 +48,9 @@ export default function AdminServicesPage() {
       else await updateService(selected.id, data);
       toast.success(modal === 'create' ? 'Service created' : 'Service updated');
       setModal(null); load();
-    } catch { toast.error('Failed to save service'); }
-    finally { setSaving(false); }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to save service');
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
@@ -51,11 +59,47 @@ export default function AdminServicesPage() {
     catch { toast.error('Failed to delete'); }
   };
 
+  // Process files through crop before adding to queue
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const cropped: File[] = [];
+    const previews: string[] = [];
+
+    for (const file of files) {
+      try {
+        const c = await cropAndResize(file, CROP_PRESETS.serviceImage);
+        cropped.push(c);
+        previews.push(URL.createObjectURL(c));
+      } catch {
+        toast.error(`Failed to process ${file.name}`);
+      }
+    }
+
+    setUploadQueue(q => [...q, ...cropped]);
+    setUploadPreviews(p => [...p, ...previews]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFromQueue = (idx: number) => {
+    setUploadQueue(q => q.filter((_, i) => i !== idx));
+    setUploadPreviews(p => p.filter((_, i) => i !== idx));
+  };
+
   const handleUpload = async () => {
-    if (!uploadingFiles || !selected) return;
+    if (!uploadQueue.length || !selected) return;
     setUploading(true);
-    try { await uploadImages(selected.id, uploadingFiles); toast.success('Images uploaded'); setUploadingFiles(null); load(); }
-    catch { toast.error('Upload failed'); }
+    try {
+
+      const form = new FormData();
+      uploadQueue.forEach(f => form.append('images', f));
+      await api.post(`/media/services/${selected.id}/images`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      toast.success(`${uploadQueue.length} image(s) uploaded`);
+      setUploadQueue([]);
+      setUploadPreviews([]);
+      load();
+    } catch { toast.error('Upload failed'); }
     finally { setUploading(false); }
   };
 
@@ -76,7 +120,6 @@ export default function AdminServicesPage() {
         <button onClick={openCreate} className="btn-primary">+ New Service</button>
       </div>
 
-      {/* Category Filter */}
       <div className="flex gap-2 flex-wrap">
         <button onClick={() => setFilterCat('ALL')} className={`px-4 py-1.5 text-xs tracking-widest uppercase transition-colors ${filterCat === 'ALL' ? 'bg-charcoal-900 text-white' : 'bg-white border border-charcoal-200 text-charcoal-600 hover:bg-charcoal-50'}`}>All</button>
         {categories.map(c => (
@@ -84,7 +127,6 @@ export default function AdminServicesPage() {
         ))}
       </div>
 
-      {/* Services Table */}
       <div className="bg-white border border-charcoal-100 overflow-hidden">
         {loading ? <div className="p-12 text-center text-charcoal-400">Loading...</div> : (
           <div className="overflow-x-auto">
@@ -135,8 +177,10 @@ export default function AdminServicesPage() {
 
       {/* Create/Edit Modal */}
       {(modal === 'create' || modal === 'edit') && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setModal(null)}>
-          <div className="bg-white w-full max-w-xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onMouseDown={e => { if (e.target === e.currentTarget) setModal(null); }}>
+          <div className="bg-white w-full max-w-xl shadow-2xl max-h-[90vh] overflow-y-auto"
+            onMouseDown={e => e.stopPropagation()}>
             <div className="px-6 py-5 border-b border-charcoal-100 flex items-center justify-between">
               <h2 className="font-display text-2xl font-light text-charcoal-900">{modal === 'create' ? 'New Service' : 'Edit Service'}</h2>
               <button onClick={() => setModal(null)} className="text-charcoal-400 hover:text-charcoal-900">✕</button>
@@ -151,7 +195,7 @@ export default function AdminServicesPage() {
               </div>
               <div>
                 <label className="label">Service Name</label>
-                <input required value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} className="input-field" placeholder="e.g. Raffles to Jetty (Taxi)" />
+                <input required value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} className="input-field" />
               </div>
               <div>
                 <label className="label">Description</label>
@@ -204,34 +248,72 @@ export default function AdminServicesPage() {
 
       {/* Images Modal */}
       {modal === 'images' && selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setModal(null)}>
-          <div className="bg-white w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onMouseDown={e => { if (e.target === e.currentTarget) setModal(null); }}>
+          <div className="bg-white w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
+            onMouseDown={e => e.stopPropagation()}>
             <div className="px-6 py-5 border-b border-charcoal-100 flex items-center justify-between">
               <h2 className="font-display text-xl font-light text-charcoal-900">Images — {selected.name}</h2>
               <button onClick={() => setModal(null)} className="text-charcoal-400 hover:text-charcoal-900">✕</button>
             </div>
             <div className="p-6 space-y-5">
               {/* Existing images */}
-              <div className="grid grid-cols-4 gap-2">
-                {(services.find(s => s.id === selected.id)?.images || []).map((img: any) => (
-                  <div key={img.id} className="relative group">
-                    <div className="aspect-square overflow-hidden bg-charcoal-100">
-                      <img src={`${API_BASE}${img.url}`} alt="" className="w-full h-full object-cover" />
-                    </div>
-                    <button onClick={() => handleDeleteImage(img.id)} className="absolute top-1 right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
-                  </div>
-                ))}
-              </div>
-              {/* Upload */}
               <div>
-                <label className="label">Upload New Images</label>
-                <input type="file" multiple accept="image/*" onChange={e => setUploadingFiles(e.target.files)} className="input-field text-xs" />
-                {uploadingFiles && uploadingFiles.length > 0 && (
-                  <p className="text-xs text-charcoal-500 mt-1">{uploadingFiles.length} file(s) selected</p>
-                )}
+                <p className="label mb-2">Current Images</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {(services.find(s => s.id === selected.id)?.images || []).map((img: any) => (
+                    <div key={img.id} className="relative group">
+                      <div className="aspect-square overflow-hidden bg-charcoal-100 rounded">
+                        <img src={`${API_BASE}${img.url}`} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <button onClick={() => handleDeleteImage(img.id)} className="absolute top-1 right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                    </div>
+                  ))}
+                  {(services.find(s => s.id === selected.id)?.images || []).length === 0 && (
+                    <p className="text-xs text-charcoal-400 col-span-4 py-2">No images yet</p>
+                  )}
+                </div>
               </div>
+
+              {/* Upload queue previews */}
+              {uploadPreviews.length > 0 && (
+                <div>
+                  <p className="label mb-2">Ready to upload ({uploadPreviews.length})</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {uploadPreviews.map((url, i) => (
+                      <div key={i} className="relative group">
+                        <div className="aspect-square overflow-hidden bg-charcoal-100 rounded border-2 border-gold-300">
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                        </div>
+                        <button onClick={() => removeFromQueue(i)} className="absolute top-1 right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Select files */}
+              <div>
+                <p className="label mb-1">Add Images</p>
+                <p className="text-[10px] text-charcoal-400 mb-2">Images are auto-cropped to 900×675px (4:3). Max 10MB each.</p>
+                <input ref={fileInputRef} type="file" multiple accept="image/*" onChange={handleFileSelect} className="hidden" />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full border border-dashed border-charcoal-300 hover:border-charcoal-500 text-charcoal-500 py-3 text-xs tracking-widest uppercase transition-colors"
+                >
+                  + Select Images
+                </button>
+              </div>
+
               <div className="flex gap-3">
-                <button onClick={handleUpload} disabled={!uploadingFiles || uploading} className="btn-primary flex-1">{uploading ? 'Uploading...' : 'Upload Images'}</button>
+                <button
+                  onClick={handleUpload}
+                  disabled={!uploadQueue.length || uploading}
+                  className="btn-primary flex-1"
+                >
+                  {uploading ? 'Uploading...' : `Upload ${uploadQueue.length > 0 ? `(${uploadQueue.length})` : ''}`}
+                </button>
                 <button onClick={() => setModal(null)} className="btn-ghost flex-1">Close</button>
               </div>
             </div>
