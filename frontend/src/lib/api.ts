@@ -34,11 +34,26 @@ export const getSettings = () => api.get('/settings').then(r => r.data);
 // ── Auth ─────────────────────────────────────────────────────
 export const login = (email: string, password: string) => api.post('/auth/login', { email, password }).then(r => r.data);
 
+// ── Me (self) ────────────────────────────────────────────────
+export const getMe = () => api.get('/users/me').then(r => r.data);
+export const updateMe = (data: { name?: string; currentPassword?: string; newPassword?: string; profilePhoto?: string }) =>
+  api.put('/users/me', data).then(r => r.data);
+export const uploadProfilePhoto = (file: File) => {
+  const form = new FormData();
+  form.append('photo', file);
+  return api.post('/media/profile/photo', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+};
+
 // ── Admin: Categories ────────────────────────────────────────
 export const getAllCategories = () => api.get('/categories', { params: { all: 'true' } }).then(r => r.data);
 export const createCategory = (data: any) => api.post('/categories', data).then(r => r.data);
 export const updateCategory = (id: string, data: any) => api.put(`/categories/${id}`, data).then(r => r.data);
 export const deleteCategory = (id: string) => api.delete(`/categories/${id}`).then(r => r.data);
+export const uploadCategoryPhoto = (id: string, file: File) => {
+  const form = new FormData();
+  form.append('photo', file);
+  return api.post(`/media/categories/${id}/photo`, form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+};
 
 // ── Admin: Services ──────────────────────────────────────────
 export const getAllServices = () => api.get('/services', { params: { all: 'true' } }).then(r => r.data);
