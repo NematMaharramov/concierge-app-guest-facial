@@ -7,6 +7,7 @@ export class CreateCategoryDto {
   @IsString() slug: string;
   @IsString() @IsOptional() description?: string;
   @IsString() @IsOptional() icon?: string;
+  @IsString() @IsOptional() photo?: string;
   @IsNumber() @IsOptional() sortOrder?: number;
   @IsBoolean() @IsOptional() isVisible?: boolean;
 }
@@ -15,6 +16,7 @@ export class UpdateCategoryDto {
   @IsString() @IsOptional() name?: string;
   @IsString() @IsOptional() description?: string;
   @IsString() @IsOptional() icon?: string;
+  @IsString() @IsOptional() photo?: string;
   @IsNumber() @IsOptional() sortOrder?: number;
   @IsBoolean() @IsOptional() isVisible?: boolean;
 }
