@@ -28,7 +28,6 @@ export class UpdateReservationDto {
 export class ReservationsService {
   constructor(private prisma: PrismaService, private auditService: AuditService) {}
 
-  // FIX: All authenticated users see ALL reservations (not just their own)
   findAll() {
     return this.prisma.reservation.findMany({
       orderBy: { createdAt: 'desc' },
@@ -39,7 +38,7 @@ export class ReservationsService {
     });
   }
 
-  async findOne(id: string, userId?: string, role?: string) {
+  async findOne(id: string) {
     const res = await this.prisma.reservation.findUnique({
       where: { id },
       include: {
@@ -52,7 +51,6 @@ export class ReservationsService {
       },
     });
     if (!res) throw new NotFoundException('Reservation not found');
-    // All authenticated users can view any reservation
     return res;
   }
 
@@ -86,10 +84,8 @@ export class ReservationsService {
   }
 
   async update(id: string, dto: UpdateReservationDto, userId: string, role: string, ip?: string) {
-    const existing = await this.findOne(id, userId, role);
-
-    // Only creator or admin can edit
-    if (role !== 'ADMIN' && existing.userId !== userId) throw new ForbiddenException('Only the creator or an admin can edit this reservation');
+    // All authenticated users can edit any reservation
+    const existing = await this.findOne(id);
 
     const updateData: any = {};
     if (dto.serviceId !== undefined) updateData.serviceId = dto.serviceId;
@@ -131,8 +127,12 @@ export class ReservationsService {
   }
 
   async remove(id: string, userId: string, role: string, ip?: string) {
-    const existing = await this.findOne(id, userId, role);
-    if (role !== 'ADMIN' && existing.userId !== userId) throw new ForbiddenException('Only the creator or an admin can delete this reservation');
+    // Only admins can delete reservations
+    if (role !== 'ADMIN') {
+      throw new ForbiddenException('Only administrators can delete reservations');
+    }
+
+    const existing = await this.findOne(id);
 
     await this.auditService.log({
       userId,
@@ -152,7 +152,6 @@ export class ReservationsService {
     return this.prisma.reservation.delete({ where: { id } });
   }
 
-  // Stats include COMPLETED
   getStats() {
     return this.prisma.$transaction([
       this.prisma.reservation.count(),
