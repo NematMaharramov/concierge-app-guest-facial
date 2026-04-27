@@ -60,14 +60,7 @@ export class ServicesService {
     return service;
   }
 
-  /**
-   * Create a service.
-   * Rejects with 409 Conflict if a service with the same name already exists
-   * in the same category — prevents accidental duplicates without touching
-   * any existing data.
-   */
   async create(dto: CreateServiceDto) {
-    // Duplicate check: same name in the same category
     const existing = await this.prisma.service.findFirst({
       where: {
         categoryId: dto.categoryId,
@@ -89,7 +82,28 @@ export class ServicesService {
   }
 
   async update(id: string, dto: UpdateServiceDto) {
-    await this.findOne(id);
+    const current = await this.findOne(id);
+
+    // Check for duplicate name if name or categoryId is being changed
+    if (dto.name !== undefined || dto.categoryId !== undefined) {
+      const targetCategoryId = dto.categoryId ?? current.categoryId;
+      const targetName = dto.name ?? current.name;
+
+      const duplicate = await this.prisma.service.findFirst({
+        where: {
+          categoryId: targetCategoryId,
+          name: { equals: targetName, mode: 'insensitive' },
+          NOT: { id },
+        },
+      });
+
+      if (duplicate) {
+        throw new ConflictException(
+          `A service named "${targetName}" already exists in this category.`,
+        );
+      }
+    }
+
     return this.prisma.service.update({
       where: { id },
       data: dto,
