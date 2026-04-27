@@ -19,6 +19,20 @@ export class UsersController {
     return this.usersService.updateProfile(req.user.id, dto);
   }
 
+  // ── Theme preference (per-user, stored in DB) ───────────────────
+  @Get('me/theme')
+  @UseGuards(JwtAuthGuard)
+  async getTheme(@Request() req: any) {
+    const theme = await this.usersService.getTheme(req.user.id);
+    return { theme };
+  }
+
+  @Put('me/theme')
+  @UseGuards(JwtAuthGuard)
+  setTheme(@Request() req: any, @Body() body: { theme: string }) {
+    return this.usersService.setTheme(req.user.id, body.theme);
+  }
+
   // ── Admin-only endpoints ────────────────────────────────────────
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
