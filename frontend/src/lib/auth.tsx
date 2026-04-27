@@ -1,9 +1,22 @@
 'use client';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { login as apiLogin } from './api';
+import { login as apiLogin, getMe } from './api';
 
-interface User { id: string; email: string; name: string; role: 'ADMIN' | 'CONCIERGE'; }
-interface AuthCtx { user: User | null; token: string | null; login: (e: string, p: string) => Promise<void>; logout: () => void; loading: boolean; }
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: 'ADMIN' | 'CONCIERGE';
+  profilePhoto?: string;
+}
+interface AuthCtx {
+  user: User | null;
+  token: string | null;
+  login: (e: string, p: string) => Promise<void>;
+  logout: () => void;
+  refreshUser: () => Promise<void>;
+  loading: boolean;
+}
 
 const AuthContext = createContext<AuthCtx>({} as AuthCtx);
 
@@ -35,7 +48,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = '/login';
   };
 
-  return <AuthContext.Provider value={{ user, token, login, logout, loading }}>{children}</AuthContext.Provider>;
+  const refreshUser = async () => {
+    try {
+      const fresh = await getMe();
+      setUser(fresh);
+      localStorage.setItem('user', JSON.stringify(fresh));
+    } catch (_) {}
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, token, login, logout, refreshUser, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export const useAuth = () => useContext(AuthContext);
