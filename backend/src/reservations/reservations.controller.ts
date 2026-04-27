@@ -12,13 +12,13 @@ export class ReservationsController {
 
   @Get()
   findAll() {
-    // All authenticated users see ALL reservations
     return this.reservationsService.findAll();
   }
 
+  // FIX: call findOne(id) only — extra args removed from service signature
   @Get(':id')
-  findOne(@Param('id') id: string, @Request() req: any) {
-    return this.reservationsService.findOne(id, req.user.id, req.user.role);
+  findOne(@Param('id') id: string) {
+    return this.reservationsService.findOne(id);
   }
 
   @Post()
