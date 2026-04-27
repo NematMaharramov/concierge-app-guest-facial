@@ -44,6 +44,10 @@ export const uploadProfilePhoto = (file: File) => {
   return api.post('/media/profile/photo', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
 };
 
+// ── Theme preference (per-user, DB-backed) ───────────────────
+export const getUserTheme = () => api.get('/users/me/theme').then(r => r.data.theme as string);
+export const setUserTheme = (theme: string) => api.put('/users/me/theme', { theme }).then(r => r.data.theme as string);
+
 // ── Admin: Categories ────────────────────────────────────────
 export const getAllCategories = () => api.get('/categories', { params: { all: 'true' } }).then(r => r.data);
 export const createCategory = (data: any) => api.post('/categories', data).then(r => r.data);
