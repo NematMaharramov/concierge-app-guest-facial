@@ -1,0 +1,387 @@
+# Concierge Platform Transformasiyası — Texniki Spesifikasiya (v2)
+
+> **Dəyişiklik qeydi (v1 → v2):** Praslin Seychelles datası artıq "baza template" kimi istifadə
+> olunmur — o, sadəcə **demo/nümunə tenant** statusuna keçir. Platformanın əsasında **Biznes
+> Vertikal Şablonları** kitabxanası dayanır (Resort/Leisure, Business/City Hotel və s.), kateqoriya
+> daxilində **alt-filtrlər** (mətbəx növü, tur lokasiyası və s.) dəstəklənir, **Aylıq Tədbir Siyahısı**,
+> **Pre-Arrival Letter** (Outlook + Opera PMS inteqrasiyalı) və **Excel İdxal Aləti** modulları
+> əlavə olunub.
+
+---
+
+## 0. Ümumi Prinsiplər (dəyişməz qalır)
+
+1. Hər schema dəyişikliyi geriyə-uyğun migration ilə.
+2. Praslin Praslin-in mövcud datası itməməli — "Demo Tenant #1" kimi köçürülür.
+3. Scope təcridi: Guest site ≠ Admin panel ≠ Super Admin panel.
+4. Kod yazmadan əvvəl audit.
+5. Idempotent seed/import.
+
+---
+
+## 1. Rol Arxitekturası (dəyişməz)
+
+| Rol | Kim | Səlahiyyət |
+|---|---|---|
+| `SUPER_ADMIN` | Sən / komandan | Tenant yaratma, brendinq, şablon seçimi, inteqrasiya konfiqurasiyası |
+| `ADMIN` | Otel/brend | Öz tenant-ı daxilində tam idarəetmə (kateqoriya, servis, tədbir, məktub şablonu, istifadəçi) |
+| `CONCIERGE` | Otelin işçiləri | Rezervasiya, pre-arrival letter göndərmə, taxi/telefon siyahıları |
+
+`tenantId` bütün əsas modellərə (`Category`, `Service`, `Reservation`, `User`, `Event`,
+`LetterTemplate`, `AuditLog`) əlavə olunur (v1-də olduğu kimi).
+
+---
+
+## Part 1 — Tenant İnfrastrukturu (dəyişməz, v1-dəki kimi)
+
+`Tenant`, `TenantBranding` modelləri, `tenantId` backfill, `TenantContextMiddleware`,
+`TenantGuard`, JWT-yə `tenantId`. Bu, hələ də hər şeyin təməlidir və birinci icra olunmalıdır.
+
+---
+
+## Part 2 — Biznes Vertikal Şablonları (YENİ, v1-i əvəz edir)
+
+Bu, sənin ən vacib düzəlişindir: Praslin-in "Taxi/Boat/Catamaran/Golf/Helicopter" strukturu
+yalnız **bir vertikala** (Resort/Leisure) aiddir. Fairmont Baku kimi biznes/şəhər otelinin
+tamam fərqli kateqoriya dəsti lazımdır. Ona görə kateqoriyalar artıq əl ilə yazılmır —
+**şablon kitabxanasından** seçilir.
+
+### 1.1 Data modeli
+
+```prisma
+enum BusinessVertical {
+  RESORT_LEISURE       // Praslin tipli: taxi, boat, golf, helicopter...
+  BUSINESS_CITY_HOTEL  // Fairmont Baku tipli: muzey, restoran, tur, spa...
+  BOUTIQUE_HOTEL
+  CUSTOM                // sıfırdan, şablonsuz
+}
+
+model CategoryTemplate {
+  id            String   @id @default(uuid())
+  vertical      BusinessVertical
+  name          String                 // "Restaurants", "Tours", "Spa & Wellness"
+  slug          String
+  icon          String?
+  description   String?
+  sortOrder     Int      @default(0)
+  filterGroups  FilterGroupTemplate[]  // aşağıya bax
+}
+
+// "Cuisine", "Tour Location" kimi alt-filtr qrupları
+model FilterGroupTemplate {
+  id                  String   @id @default(uuid())
+  categoryTemplateId  String
+  name                String   // "Cuisine Type", "Tour Location"
+  options             Json     // ["Italian", "Japanese", "Local/Azerbaijani", ...]
+  isRequired          Boolean  @default(false)
+
+  categoryTemplate    CategoryTemplate @relation(fields: [categoryTemplateId], references: [id])
+}
+```
+
+### 1.2 Tenant yaradılma axını (Super Admin panelində)
+
+1. Super Admin yeni tenant yaradır → **Biznes Vertikalı seçir** (`BUSINESS_CITY_HOTEL` və s.)
+2. Sistem müvafiq `CategoryTemplate`-ləri həmin tenant üçün **konkret `Category` sətirlərinə** kopyalayır (boş, servis datası olmadan — sadəcə struktur)
+3. `FilterGroupTemplate`-lər də konkret `FilterGroup`/`FilterOption` sətirlərinə kopyalanır (aşağı bax)
+4. Nəticə: yeni brend admin panelinə ilk dəfə girəndə artıq "Museums", "Restaurants" (Cuisine filtri ilə), "Tours" (City Center/Out of City filtri ilə), "Spa & Relaxing" kateqoriyaları hazır olur — o, sadəcə real qiymət/təsvir/şəkil daxil edir (və ya sənin komandan Excel idxalı ilə doldurur — Part 6-ya bax)
+
+### 1.3 İki başlanğıc şablon nümunəsi (ilk MVP üçün doldurulmalı)
+
+**`RESORT_LEISURE`** (Praslin-dən çıxarılan, amma marka-neytral struktur):
+Taxi & Transfers, Boat Excursions, Water Sports & Catamaran, Car Rental, Golf, Helicopter/Air Transfers
+
+**`BUSINESS_CITY_HOTEL`** (Fairmont Baku nümunəsi əsasında):
+- Museums *(filtr yoxdur, sadəcə siyahı)*
+- Restaurants & Dining *(filtr: Cuisine Type — Azerbaijani, Italian, Japanese, Steakhouse və s.)*
+- Tours *(filtr: Location — City Center / Out of City; əlavə filtr: Duration — Half Day / Full Day)*
+- Spa & Relaxing
+- Shopping & Local Markets
+- Business Services *(çap, tərcümə, konfrans dəstəyi və s. — biznes otelə xas)*
+- Airport & City Transfers
+
+> Bu ikisi başlanğıc üçün kifayətdir; üçüncü/dördüncü vertikal (Boutique, Airport Hotel və s.) sonradan əlavə oluna bilər — struktur artıq bunu dəstəkləyir.
+
+---
+
+## Part 3 — Kateqoriya Daxili Alt-Filtr (Facet) Sistemi
+
+Hazırkı sxem (`Category → Service`, flat) "Restaurants" daxilində mətbəx növünə görə
+süzgəcləmə kimi tələbləri dəstəkləmir. Bunun üçün:
+
+```prisma
+model FilterGroup {
+  id          String   @id @default(uuid())
+  tenantId    String
+  categoryId  String
+  name        String              // "Cuisine Type"
+  isRequired  Boolean  @default(false)
+
+  options     FilterOption[]
+  category    Category @relation(fields: [categoryId], references: [id])
+}
+
+model FilterOption {
+  id            String   @id @default(uuid())
+  filterGroupId String
+  label         String   // "Japanese"
+  sortOrder     Int      @default(0)
+
+  filterGroup   FilterGroup @relation(fields: [filterGroupId], references: [id])
+  services      ServiceFilterValue[]
+}
+
+// many-to-many: bir restoran birdən çox mətbəxə aid ola bilər (məs. "Fusion")
+model ServiceFilterValue {
+  serviceId      String
+  filterOptionId String
+
+  service        Service      @relation(fields: [serviceId], references: [id])
+  filterOption   FilterOption @relation(fields: [filterOptionId], references: [id])
+
+  @@id([serviceId, filterOptionId])
+}
+```
+
+**Guest site tərəfində:** kateqoriya səhifəsində (`services/[slug]/page.tsx`) əgər həmin
+kateqoriyanın `FilterGroup`-ları varsa, üstdə çip-tərzi filtr paneli göstərilir (məs.
+"All / Italian / Japanese / Local"). Filtr yoxdursa (məs. "Museums"), sadə siyahı qalır —
+komponent bunu avtomatik aşkar etməlidir, hər kateqoriya üçün əl ilə fərqli kod yazılmamalı.
+
+**Admin paneldə:** Kateqoriya redaktə ekranına "Filtr qrupları" bölməsi əlavə olunur — admin
+istəyəndə öz filtr qrupunu da yarada bilər (yalnız şablondan gələnlərlə məhdudlaşmır).
+
+---
+
+## Part 4 — Aylıq Tədbir Siyahısı (Monthly Events)
+
+```prisma
+model Event {
+  id          String   @id @default(uuid())
+  tenantId    String
+  title       String
+  description String?
+  imageUrl    String?
+  startDate   DateTime
+  endDate     DateTime?
+  location    String?          // "Hotel Ballroom", "Old City" və s.
+  category    String?          // "Music", "Culinary", "Cultural" (sadə string, filtrə ehtiyac yoxdur)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+```
+
+- [ ] Admin panelində CRUD (ay üzrə təqvim görünüşü tövsiyə olunur)
+- [ ] Guest site-da opsional "Bu ay nə baş verir?" bölməsi (feature flag ilə açıq/qapalı — hər otel istəməyə bilər)
+- [ ] **Pre-Arrival Letter modulunda seçim mənbəyi kimi istifadə olunur** (Part 5-ə bax) — qonağın qalma tarixinə uyğun (`startDate`/`endDate` stay aralığı ilə kəsişən) tədbirlər avtomatik önə çıxarılır, concierge bunlardan seçib məktuba əlavə edir
+
+---
+
+## Part 5 — Pre-Arrival Letter Sistemi (YENİ, prioritet modul)
+
+Bu, sənin təsvir etdiyin ən mürəkkəb funksionaldır. Üç hissəyə bölünür: **Şablon Mühərriki**,
+**Göndərmə Sihirbazı (wizard)**, **Outlook/Opera inteqrasiyası**.
+
+### 5.1 Şablon Mühərriki
+
+```prisma
+model LetterTemplate {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String              // "Standard Pre-Arrival"
+  subject     String              // merge-field dəstəkli: "Welcome to {{hotel_name}}, {{guest_first_name}}!"
+  bodyHtml    String              // rich-text HTML, merge-field placeholder-ləri ilə
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+```
+
+- [ ] Admin/Concierge panelində rich-text editor (məs. **TipTap** — React ilə asan inteqrasiya olunur, mövcud Next.js stack-inə uyğun)
+- [ ] Dəstəklənən merge field-lər: `{{guest_first_name}}`, `{{guest_full_name}}`, `{{room_type}}`, `{{room_inclusions}}`, `{{arrival_date}}`, `{{departure_date}}`, `{{hotel_name}}`, `{{hotel_general_info}}`, `{{weather_forecast}}`, `{{event_list}}`
+- [ ] Bir tenant birdən çox şablon saxlaya bilər (məs. VIP qonaq üçün ayrı, standart üçün ayrı)
+
+### 5.2 Göndərmə Sihirbazı (Concierge Dashboard)
+
+Axın:
+
+1. **Qonaq seçimi** — ya Opera PMS-dən gələn "Gözlənilən qonaqlar" siyahısından seçilir (Part 5-in v1-dəki `GuestArrival` inteqrasiyası ilə birbaşa bağlıdır), ya da əl ilə daxil edilir (PMS yoxdursa/əlaqə yoxdursa fallback)
+2. **Avtomatik doldurulan sahələr** (PMS mövcuddursa): qonaq adı, email, otaq tipi, gəliş/gediş tarixi
+3. **Otaq daxilolmaları (room inclusions)** — bu, adətən otaq tipinə bağlı sabit mətndir; admin panelində "Otaq Tipləri" üçün əvvəlcədən təyin edilə bilər (`RoomTypeInfo` kiçik cədvəli: `{tenantId, roomTypeName, inclusionsText}`), PMS-dən gələn otaq kodu buna uyğunlaşdırılır
+4. **Hava proqnozu** — tenant-ın lokasiyasına (`Tenant`/`TenantBranding`-də lat/long) və qonağın gəliş tarixinə görə xarici hava API-sindən (məs. OpenWeatherMap) avtomatik çəkilir, mətnə `{{weather_forecast}}` kimi inteqrasiya olunur
+5. **Tədbir seçimi** — sistem qalma tarixinə uyğun `Event`-ləri təklif edir (checkbox siyahısı), concierge istədiklərini seçir → seçilənlər `{{event_list}}` yerinə formatlanmış şəkildə yazılır
+6. **Önizləmə** — final HTML göstərilir, concierge son dəfə əl ilə redaktə edə bilər (fərdiləşdirmə tələbi buradadır)
+7. **Göndər** — Outlook inteqrasiyası vasitəsilə real email göndərilir (5.3-ə bax)
+8. **Log** — göndəriş `GuestCommunication` cədvəlinə yazılır (audit + "bu qonağa nə vaxt nə göndərilib" tarixçəsi üçün)
+
+```prisma
+model GuestCommunication {
+  id              String   @id @default(uuid())
+  tenantId        String
+  guestName       String
+  guestEmail      String
+  pmsReservationId String?     // Opera-dan gələn reservation reference (varsa)
+  templateId      String
+  finalHtml       String       // göndərilən son variant (audit üçün saxlanılır)
+  eventIds        Json?        // seçilmiş tədbirlərin id-ləri
+  weatherSnapshot Json?        // göndəriş anındakı hava datası (audit üçün "dondurulmuş" nüsxə)
+  sentByUserId    String
+  sentAt          DateTime @default(now())
+  status          String   @default("SENT")  // SENT / FAILED
+}
+```
+
+### 5.3 Outlook İnteqrasiyası
+
+Microsoft Graph API (`Mail.Send` icazəsi) ilə. İki yanaşma var, ikisini də sənədə salıram
+ki, seçim edəsən:
+
+| Yanaşma | Necə işləyir | Üstünlük | Çatışmazlıq |
+|---|---|---|---|
+| **A. Delegated (hər concierge öz hesabından)** | Hər işçi öz Outlook hesabını OAuth ilə bağlayır, email onun öz ünvanından gedir | Qonaq "real insandan" cavab alır, daha şəxsi | Hər işçi ayrıca autentifikasiya etməlidir, refresh token idarəetməsi lazımdır |
+| **B. Application permission (paylaşılan qutu)** | `concierge@hotel.com` kimi ümumi bir mailbox-dan, tenant admin-in tək dəfəlik bağladığı app-level icazə ilə | Sadə quraşdırma, işçi tərəfi qarışıqlıq yoxdur | Bütün məktublar eyni ünvandan gedir, "kim göndərib" yalnız daxili logda görünür |
+
+**Tövsiyəm:** B ilə başla (daha az sürtünmə, MVP üçün kifayətdir), A-nı gələcəkdə "premium
+feature" kimi əlavə et.
+
+- [ ] `TenantIntegration` cədvəlinə `provider: 'outlook'` sətri (şifrələnmiş access/refresh token)
+- [ ] `backend/src/integrations/providers/outlook/outlook.adapter.ts` — `sendMail(to, subject, html)` metodu
+- [ ] Göndəriş uğursuz olarsa, retry məntiqi + concierge-ə UI-də xəbərdarlıq
+
+### 5.4 Opera PMS ilə əlaqə (v1-dəki Part 5 ilə birləşir)
+
+- Qonağın email-i, otaq tipi, gəliş/gediş tarixi Opera-dan avtomatik çəkilir (`GuestArrival` modelindən, v1-dəki adapter arxitekturası ilə)
+- PMS-də email yoxdursa/əlaqə kəsilibsə, concierge əl ilə daxil edə bilər — sistem heç vaxt "PMS olmadan işləməz" vəziyyətinə düşməməlidir (fallback həmişə olmalıdır)
+
+---
+
+## Part 6 — Excel İdxal Aləti (YENİ)
+
+Sənin qeyd etdiyin kimi: brend öz datasını (mövcud qiymət siyahıları, xidmət təsvirləri)
+Excel formatında verəcək, sənin komandan onu **kodla deyil, admin paneldəki bir alətlə**
+idxal edəcək (məhz bu layihənin özü belə başlamışdı — indi bunu təkrar-istifadə edilə bilən
+alətə çevirmək lazımdır).
+
+- [ ] `frontend`: "Import from Excel" ekranı (Super Admin panelində, onboarding zamanı, VƏ Admin panelində, sonrakı yeniləmələr üçün)
+- [ ] Axın: fayl yüklə → sistem sütunları tanıyır/təklif edir → istifadəçi sütun-sahə uyğunlaşdırması edir (məs. "Column C" → `priceAmount`) → önizləmə cədvəli → təsdiq → idxal
+- [ ] Kateqoriya/filtr uyğunlaşdırması: Excel-də "Cuisine" sütunu varsa, sistem bunu mövcud `FilterOption`-larla uyğunlaşdırmağa çalışır, tapmadığını "yeni filtr seçimi yaratmaq" kimi təklif edir
+- [ ] Təkrar idxal (update) ssenarisi dəstəklənməli — ilk versiya "hamısını sil, yenidən yaz" (mövcud `seed.ts`-in `deleteMany` məntiqi) ola bilər, sonra "smart merge" (yalnız dəyişənləri yenilə) əlavə oluna bilər
+- [ ] Backend tərəfi: `xlsx`/`exceljs` kitabxanası ilə parse, ümumi bir `ImportService` (kateqoriyaya bağlı deyil, generic sütun-sahə mapping mühərriki)
+
+---
+
+## Part 7 — Super Admin Paneli (v1-dəki Part 2, indi Part 2-nin üstünə qurulur)
+
+v1-dəki bütün funksionallıq eynilə qalır (tenant CRUD, brendinq, feature flag, domen), üstünə:
+
+- [ ] Tenant yaradılma sihirbazına **Biznes Vertikalı seçimi addımı** əlavə olunur (Part 2)
+- [ ] Onboarding sihirbazının son addımı: "Excel faylını indi yüklə" (opsional — sonra da edilə bilər)
+
+---
+
+## Part 8 — Fayl Saxlama, Domen/Subdomain, Təhlükəsizlik (v1-dəki Part 4, 8, 9 — dəyişməz)
+
+Dəyişiklik yoxdur, v1-dəki kimi qalır: S3/R2 miqrasiyası, subdomain marşrutlaşdırması,
+tenant-scoped audit log, credential şifrələməsi.
+
+---
+
+## Part 9 — Staff Utility Modulları (v1-dəki Part 6 — dəyişməz)
+
+Taxi Driver Directory, Phone Directory, Price Sheets — eynilə v1-dəki kimi. Fərq yalnız
+bunun da artıq **vertikal şablonla əlaqəli** ola bilməsidir (məs. biznes otelinə "taxi
+driver" siyahısı yenə lazımdır, amma "boat captain" siyahısı yox) — bu, sadəcə hansı
+modulların `TenantFeatureFlag` ilə açıldığına aiddir, struktur dəyişikliyi tələb etmir.
+
+---
+
+## Part 10 — PWA/Desktop Shortcuts (v1-dəki Part 7 — dəyişməz)
+
+---
+
+## 8. Əlavə Tövsiyələrim (yenilənmiş, v1-ə əlavələr)
+
+v1-də yazdıqlarım (i18n, S3 miqrasiyası, admin panel neytral teması, billing zəmini,
+onboarding sihirbazı, SEO metadata) hələ də keçərlidir. Bunlara əlavə edirəm:
+
+1. **GDPR/məlumat saxlama siyasəti.** `GuestCommunication` cədvəli qonaqların email
+   ünvanlarını saxlayır — bu, şəxsi məlumatdır. Ən azı: (a) neçə müddətdən sonra avtomatik
+   silinəcəyinə dair bir "retention policy" sahəsi, (b) qonağın "bu email-ləri artıq istəmirəm"
+   deyə bilməsi üçün minimal bir mexanizm barədə düşünülməli (hüquqi tələb ola bilər, xüsusən
+   Avropa/GCC bazarlı brendlər üçün).
+
+2. **Pre-arrival letter-in "marketing" kimi qəbul edilməməsi.** Tədbir siyahısı əslində
+   marketing kontentinə bənzəyir. Bəzi ölkələrdə (email marketing qanunları) bu, "transactional"
+   (rezervasiya ilə bağlı, icazəsiz göndərilə bilən) ilə "promotional" arasında sərhəddə ola bilər.
+   Hüquqi məsləhət tələb etməsə də, ən azı email footer-ində "unsubscribe"/"contact us" linki
+   olması yaxşı təcrübədir.
+
+3. **Weather API-nin uğursuzluq halı.** Hava proqnozu xarici servisdən gəlir — o servis
+   yıxılarsa, pre-arrival letter göndərişi bloklanmamalıdır; `{{weather_forecast}}` sahəsi
+   boş/generic mətnlə ("Please check local forecast closer to your arrival") əvəz olunmalıdır.
+
+4. **Şablon versiyalaşdırması.** `LetterTemplate` redaktə olunub yenidən saxlanılanda, əvvəllər
+   göndərilmiş məktubların "audit nüsxəsi" (`GuestCommunication.finalHtml`) dəyişməməlidir —
+   bunu artıq sxemdə nəzərə almışam (`finalHtml` ayrıca saxlanılır), sadəcə bunu vurğulamaq
+   istədim ki, tətbiq zamanı unudulmasın.
+
+5. **Otaq tipi ↔ inclusions uyğunlaşdırması PMS-siz ssenari üçün də lazımdır.** Əgər bir tenant
+   hələ Opera-ya bağlanmayıbsa (əksər yeni müştərilər belə başlayacaq), otaq tipi siyahısı əl
+   ilə admin paneldə saxlanılmalıdır ki, pre-arrival letter modulu PMS olmadan da tam işləsin —
+   bunu MVP-də mütləq belə qur, "yalnız PMS ilə işləyir" vəziyyətinə düşmə.
+
+6. **Filtr sistemi guest site UX-i üçün ayrıca dizayn tələb edir.** Hazırkı kateqoriya
+   səhifəsi dizaynı (`services/[slug]/page.tsx`) tək-sıra grid formatındadır — filtr çipləri
+   əlavə olunanda bu, `frontend-design` prinsiplərinə uyğun yenidən düşünülməli ola bilər
+   (bura ayrıca bir "Part" kimi baxıla bilər, kiçik amma diqqət tələb edən UI işidir).
+
+---
+
+## 9. Sənin Nəzərdən Keçirməli Olduğun Aydınlaşdırma Sualları
+
+Bunlar sənədi tamamlamaq üçün mənim tərəfimdən qeyd olunan, sənin qərar verməli olduğun
+məqamlardır (icraya başlamazdan əvvəl cavablansa, sonrakı iş sürətlənər):
+
+1. **Outlook inteqrasiyası:** Yuxarıdakı A/B seçimindən (delegated vs paylaşılan mailbox)
+   hansını istəyirsən, yoxsa hər ikisini dəstəkləyən çevik struktur qurulsun?
+2. **Hava proqnozu mənbəyi:** Hansı API-yə üstünlük verirsən (OpenWeatherMap, WeatherAPI,
+   Visual Crossing)? Yoxsa sən artıq istifadə etdiyin bir servis var?
+3. **Event siyahısı ictimai (guest site-da görünsün) olsun, yoxsa yalnız daxili (concierge
+   üçün, pre-arrival letter məqsədilə)?** Hər ikisi ola bilər, amma default davranışı bilmək
+   lazımdır.
+4. **Excel idxal aləti kimin üçündür — yalnız sənin komandan, yoxsa gələcəkdə brendin öz
+   admini də istifadə edəcək?** Bu, UI-in nə qədər "bələdçili/idiot-proof" olacağını müəyyən edir.
+5. **`RESORT_LEISURE` və `BUSINESS_CITY_HOTEL`-dən başqa, indi bildiyin başqa vertikal
+   var mı** (məs. Airport Hotel, Boutique/Design Hotel)? Olsa, indi strukturu ona görə
+   ümumiləşdirmək daha ucuzdur.
+
+---
+
+## 10. Yenilənmiş İcra Sırası
+
+```
+Part 1  → Tenant infrastrukturu                                [KRİTİK təməl]
+Part 2  → Biznes Vertikal Şablonları (kateqoriya strukturu)     [YENİ, prioritet]
+Part 3  → Filtr/Facet sistemi                                   [Part 2 ilə sıx bağlı]
+Part 7  → Super Admin paneli (tenant CRUD + şablon seçimi)
+Part 8  → Fayl saxlama, domen/subdomain, təhlükəsizlik
+Part 6  → Excel İdxal Aləti                                     [onboarding üçün lazım]
+Part 4  → Aylıq Tədbir Siyahısı
+Part 5  → Pre-Arrival Letter (şablon mühərriki əvvəl, Outlook/Opera sonra)
+Part 9  → Staff utility modulları (taxi, phone directory)
+Part 10 → PWA/shortcuts
+(PMS tam inteqrasiyası — Part 5-in "Opera" hissəsi hər zaman ən sonda, ən çox naməlum dəyişənli)
+```
+
+---
+
+## 11. Bu Sənədin İstifadə Qaydası
+
+Hər Part üçün ayrıca söhbətə bunu belə başlaya bilərsən:
+
+> "Bu sənəddəki Part [N]-i icra edək. Əvvəlcə mövcud kodu audit et, sonra plan təqdim et,
+> təsdiqləndikdən sonra tətbiq et."
+
+Part 5 (Pre-Arrival Letter) böyük olduğu üçün onu özü də alt-fazalara bölə bilərsən:
+"Part 5.1 — Şablon Mühərriki", "Part 5.2 — Göndərmə Sihirbazı", "Part 5.3 — Outlook",
+"Part 5.4 — Opera əlaqəsi".
