@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { CategoriesModule } from './categories/categories.module';
@@ -8,10 +8,13 @@ import { AuditModule } from './audit/audit.module';
 import { MediaModule } from './media/media.module';
 import { SettingsModule } from './settings/settings.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { TenantsModule } from './tenants/tenants.module';
+import { TenantContextMiddleware } from './tenants/tenant-context.middleware';
 
 @Module({
   imports: [
     PrismaModule,
+    TenantsModule,
     AuthModule,
     UsersModule,
     CategoriesModule,
@@ -22,4 +25,8 @@ import { PrismaModule } from './prisma/prisma.module';
     SettingsModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(TenantContextMiddleware).forRoutes('*');
+  }
+}

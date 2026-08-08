@@ -20,8 +20,44 @@ enum ReservationStatus {
   COMPLETED
 }
 
+// ─── Multi-tenancy (Part 1) ─────────────────────────────────────
+// tenantId is nullable on purpose: schema changes must stay backward
+// compatible with `prisma db push` against a live database that already
+// has rows. A separate backfill script (prisma/backfill-tenant.ts) fills
+// existing rows with a default "Demo Tenant" before we ever tighten this
+// to NOT NULL in a later Part.
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branding     TenantBranding?
+  users        User[]
+  categories   Category[]
+  services     Service[]
+  reservations Reservation[]
+  auditLogs    AuditLog[]
+}
+
+model TenantBranding {
+  id           String   @id @default(uuid())
+  tenantId     String   @unique
+  logoUrl      String?
+  primaryColor String?
+  accentColor  String?
+  siteTitle    String?
+  siteSubtitle String?
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
 model User {
   id           String   @id @default(uuid())
+  tenantId     String?
   email        String   @unique
   password     String
   name         String
@@ -31,14 +67,18 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  tenant       Tenant?       @relation(fields: [tenantId], references: [id])
   reservations Reservation[]
   auditLogs    AuditLog[]
+
+  @@index([tenantId])
 }
 
 model Category {
   id          String    @id @default(uuid())
-  name        String    @unique
-  slug        String    @unique
+  tenantId    String?
+  name        String
+  slug        String
   description String?
   icon        String?
   photo       String?
@@ -47,11 +87,17 @@ model Category {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id])
   services    Service[]
+
+  @@unique([tenantId, slug])
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model Service {
   id            String    @id @default(uuid())
+  tenantId      String?
   categoryId    String
   name          String
   description   String?
@@ -66,9 +112,12 @@ model Service {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
   category      Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   images        ServiceImage[]
   reservations  Reservation[]
+
+  @@index([tenantId])
 }
 
 model ServiceImage {
@@ -84,6 +133,7 @@ model ServiceImage {
 
 model Reservation {
   id          String            @id @default(uuid())
+  tenantId    String?
   userId      String
   serviceId   String
   guestName   String
@@ -96,13 +146,17 @@ model Reservation {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
+  tenant      Tenant?           @relation(fields: [tenantId], references: [id])
   user        User              @relation(fields: [userId], references: [id])
   service     Service           @relation(fields: [serviceId], references: [id])
   auditLogs   AuditLog[]
+
+  @@index([tenantId])
 }
 
 model AuditLog {
   id             String      @id @default(uuid())
+  tenantId       String?
   userId         String
   reservationId  String?
   action         String
@@ -112,8 +166,11 @@ model AuditLog {
   ipAddress      String?
   createdAt      DateTime    @default(now())
 
+  tenant         Tenant?     @relation(fields: [tenantId], references: [id])
   user           User        @relation(fields: [userId], references: [id])
   reservation    Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
 }
 
 model SiteSettings {

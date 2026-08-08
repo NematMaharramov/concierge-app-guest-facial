@@ -9,9 +9,11 @@
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
+    "prisma:push": "prisma db push",
+    "prisma:backfill-tenant": "ts-node --project tsconfig.seed.json prisma/backfill-tenant.ts",
     "prisma:seed": "ts-node --project tsconfig.seed.json prisma/seed.ts",
     "prisma:studio": "prisma studio",
-    "setup": "prisma generate && prisma migrate deploy && ts-node --project tsconfig.seed.json prisma/seed.ts"
+    "setup": "prisma generate && prisma db push && ts-node --project tsconfig.seed.json prisma/backfill-tenant.ts && ts-node --project tsconfig.seed.json prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs/cli": "^10.0.0",

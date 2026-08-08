@@ -28,8 +28,9 @@ export class UpdateReservationDto {
 export class ReservationsService {
   constructor(private prisma: PrismaService, private auditService: AuditService) {}
 
-  findAll() {
+  findAll(tenantId?: string) {
     return this.prisma.reservation.findMany({
+      where: { ...(tenantId ? { tenantId } : {}) },
       orderBy: { createdAt: 'desc' },
       include: {
         service: { include: { category: true } },
@@ -39,9 +40,9 @@ export class ReservationsService {
   }
 
   // FIX: removed unused userId/role parameters that caused TS compile error
-  async findOne(id: string) {
-    const res = await this.prisma.reservation.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId?: string) {
+    const res = await this.prisma.reservation.findFirst({
+      where: { id, ...(tenantId ? { tenantId } : {}) },
       include: {
         service: { include: { category: true } },
         user: { select: { name: true, email: true } },
@@ -55,7 +56,7 @@ export class ReservationsService {
     return res;
   }
 
-  async create(dto: CreateReservationDto, userId: string, ip?: string) {
+  async create(dto: CreateReservationDto, userId: string, ip?: string, tenantId?: string) {
     const reservation = await this.prisma.reservation.create({
       data: {
         serviceId: dto.serviceId,
@@ -67,11 +68,13 @@ export class ReservationsService {
         totalPrice: dto.totalPrice,
         currency: dto.currency,
         status: 'PENDING',
+        ...(tenantId ? { tenantId } : {}),
       },
       include: { service: { include: { category: true } } },
     });
 
     await this.auditService.log({
+      tenantId,
       userId,
       action: 'CREATE',
       entityType: 'Reservation',
@@ -84,8 +87,8 @@ export class ReservationsService {
     return reservation;
   }
 
-  async update(id: string, dto: UpdateReservationDto, userId: string, role: string, ip?: string) {
-    const existing = await this.findOne(id);
+  async update(id: string, dto: UpdateReservationDto, userId: string, role: string, ip?: string, tenantId?: string) {
+    const existing = await this.findOne(id, tenantId);
 
     const updateData: any = {};
     if (dto.serviceId !== undefined) updateData.serviceId = dto.serviceId;
@@ -114,6 +117,7 @@ export class ReservationsService {
     }
 
     await this.auditService.log({
+      tenantId,
       userId,
       action: 'UPDATE',
       entityType: 'Reservation',
@@ -126,14 +130,15 @@ export class ReservationsService {
     return updated;
   }
 
-  async remove(id: string, userId: string, role: string, ip?: string) {
+  async remove(id: string, userId: string, role: string, ip?: string, tenantId?: string) {
     if (role !== 'ADMIN') {
       throw new ForbiddenException('Only administrators can delete reservations');
     }
 
-    const existing = await this.findOne(id);
+    const existing = await this.findOne(id, tenantId);
 
     await this.auditService.log({
+      tenantId,
       userId,
       action: 'DELETE',
       entityType: 'Reservation',
@@ -151,16 +156,17 @@ export class ReservationsService {
     return this.prisma.reservation.delete({ where: { id } });
   }
 
-  getStats() {
+  getStats(tenantId?: string) {
+    const scope = tenantId ? { tenantId } : {};
     return this.prisma.$transaction([
-      this.prisma.reservation.count(),
-      this.prisma.reservation.count({ where: { status: 'ARRANGED' } }),
-      this.prisma.reservation.count({ where: { status: 'PENDING' } }),
-      this.prisma.reservation.count({ where: { status: 'CANCELLED' } }),
-      this.prisma.reservation.count({ where: { status: 'NOT_ARRANGED' } }),
-      this.prisma.reservation.count({ where: { status: 'COMPLETED' } }),
-      this.prisma.service.count(),
-      this.prisma.user.count({ where: { role: 'CONCIERGE' } }),
+      this.prisma.reservation.count({ where: scope }),
+      this.prisma.reservation.count({ where: { ...scope, status: 'ARRANGED' } }),
+      this.prisma.reservation.count({ where: { ...scope, status: 'PENDING' } }),
+      this.prisma.reservation.count({ where: { ...scope, status: 'CANCELLED' } }),
+      this.prisma.reservation.count({ where: { ...scope, status: 'NOT_ARRANGED' } }),
+      this.prisma.reservation.count({ where: { ...scope, status: 'COMPLETED' } }),
+      this.prisma.service.count({ where: tenantId ? { tenantId } : {} }),
+      this.prisma.user.count({ where: { role: 'CONCIERGE', ...(tenantId ? { tenantId } : {}) } }),
     ]).then(([total, arranged, pending, cancelled, notArranged, completed, services, users]) => ({
       total, arranged, pending, cancelled, notArranged, completed, services, users,
     }));

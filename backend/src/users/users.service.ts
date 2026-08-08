@@ -8,6 +8,7 @@ export class CreateUserDto {
   @IsString() password: string;
   @IsString() name: string;
   @IsEnum(['ADMIN', 'CONCIERGE']) @IsOptional() role?: string;
+  @IsString() @IsOptional() tenantId?: string;
 }
 
 export class UpdateUserDto {
@@ -30,30 +31,40 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async findByEmail(email: string) {
+    // NOTE (Part 1): login is still by globally-unique email, not scoped to
+    // a tenant — the guest doesn't pick a tenant before logging in yet.
+    // This is a known follow-up once subdomain-based login exists.
     return this.prisma.user.findUnique({ where: { email } });
   }
 
-  async findAll() {
+  async findAll(tenantId?: string) {
     return this.prisma.user.findMany({
+      where: { ...(tenantId ? { tenantId } : {}) },
       select: { id: true, email: true, name: true, role: true, isActive: true, profilePhoto: true, createdAt: true },
     });
   }
 
-  async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId?: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, ...(tenantId ? { tenantId } : {}) },
       select: { id: true, email: true, name: true, role: true, isActive: true, profilePhoto: true, createdAt: true },
     });
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
 
-  async create(dto: CreateUserDto) {
+  async create(dto: CreateUserDto, tenantId?: string) {
     const exists = await this.findByEmail(dto.email);
     if (exists) throw new ConflictException('Email already in use');
     const password = await bcrypt.hash(dto.password, 10);
     return this.prisma.user.create({
-      data: { email: dto.email, password, name: dto.name, role: (dto.role as any) || 'CONCIERGE' },
+      data: {
+        email: dto.email,
+        password,
+        name: dto.name,
+        role: (dto.role as any) || 'CONCIERGE',
+        tenantId: dto.tenantId || tenantId,
+      },
       select: { id: true, email: true, name: true, role: true, isActive: true, profilePhoto: true, createdAt: true },
     });
   }

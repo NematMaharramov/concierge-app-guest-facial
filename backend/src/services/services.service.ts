@@ -34,11 +34,12 @@ export class UpdateServiceDto {
 export class ServicesService {
   constructor(private prisma: PrismaService) {}
 
-  findAll(categoryId?: string, includeHidden = false) {
+  findAll(categoryId?: string, includeHidden = false, tenantId?: string) {
     return this.prisma.service.findMany({
       where: {
         ...(categoryId ? { categoryId } : {}),
         ...(includeHidden ? {} : { isVisible: true }),
+        ...(tenantId ? { tenantId } : {}),
       },
       orderBy: [{ category: { sortOrder: 'asc' } }, { sortOrder: 'asc' }],
       include: {
@@ -48,9 +49,9 @@ export class ServicesService {
     });
   }
 
-  async findOne(id: string) {
-    const service = await this.prisma.service.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId?: string) {
+    const service = await this.prisma.service.findFirst({
+      where: { id, ...(tenantId ? { tenantId } : {}) },
       include: {
         category: true,
         images: { orderBy: { sortOrder: 'asc' } },
@@ -60,11 +61,12 @@ export class ServicesService {
     return service;
   }
 
-  async create(dto: CreateServiceDto) {
+  async create(dto: CreateServiceDto, tenantId?: string) {
     const existing = await this.prisma.service.findFirst({
       where: {
         categoryId: dto.categoryId,
         name: { equals: dto.name, mode: 'insensitive' },
+        ...(tenantId ? { tenantId } : {}),
       },
     });
 
@@ -76,13 +78,13 @@ export class ServicesService {
     }
 
     return this.prisma.service.create({
-      data: dto,
+      data: { ...dto, ...(tenantId ? { tenantId } : {}) },
       include: { category: true, images: true },
     });
   }
 
-  async update(id: string, dto: UpdateServiceDto) {
-    const current = await this.findOne(id);
+  async update(id: string, dto: UpdateServiceDto, tenantId?: string) {
+    const current = await this.findOne(id, tenantId);
 
     // Check for duplicate name if name or categoryId is being changed
     if (dto.name !== undefined || dto.categoryId !== undefined) {
@@ -94,6 +96,7 @@ export class ServicesService {
           categoryId: targetCategoryId,
           name: { equals: targetName, mode: 'insensitive' },
           NOT: { id },
+          ...(tenantId ? { tenantId } : {}),
         },
       });
 
@@ -111,8 +114,8 @@ export class ServicesService {
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, tenantId?: string) {
+    await this.findOne(id, tenantId);
     return this.prisma.service.delete({ where: { id } });
   }
 }

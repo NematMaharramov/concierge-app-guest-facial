@@ -25,17 +25,26 @@ export class UpdateCategoryDto {
 export class CategoriesService {
   constructor(private prisma: PrismaService) {}
 
-  findAll(includeHidden = false) {
+  // NOTE (Part 1): tenantId is optional everywhere below on purpose.
+  // Existing rows are being backfilled by prisma/backfill-tenant.ts, and
+  // the platform still runs on a single Render domain, so callers that
+  // don't yet pass a tenantId keep working exactly as before. Once
+  // subdomain routing lands, controllers will always pass req.tenant.id.
+
+  findAll(includeHidden = false, tenantId?: string) {
     return this.prisma.category.findMany({
-      where: includeHidden ? {} : { isVisible: true },
+      where: {
+        ...(includeHidden ? {} : { isVisible: true }),
+        ...(tenantId ? { tenantId } : {}),
+      },
       orderBy: { sortOrder: 'asc' },
       include: { _count: { select: { services: true } } },
     });
   }
 
-  async findOne(id: string) {
-    const cat = await this.prisma.category.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId?: string) {
+    const cat = await this.prisma.category.findFirst({
+      where: { id, ...(tenantId ? { tenantId } : {}) },
       include: {
         services: {
           where: { isVisible: true },
@@ -48,9 +57,9 @@ export class CategoriesService {
     return cat;
   }
 
-  async findBySlug(slug: string) {
-    const cat = await this.prisma.category.findUnique({
-      where: { slug },
+  async findBySlug(slug: string, tenantId?: string) {
+    const cat = await this.prisma.category.findFirst({
+      where: { slug, ...(tenantId ? { tenantId } : {}) },
       include: {
         services: {
           where: { isVisible: true },
@@ -63,17 +72,17 @@ export class CategoriesService {
     return cat;
   }
 
-  create(dto: CreateCategoryDto) {
-    return this.prisma.category.create({ data: dto });
+  create(dto: CreateCategoryDto, tenantId?: string) {
+    return this.prisma.category.create({ data: { ...dto, ...(tenantId ? { tenantId } : {}) } });
   }
 
-  async update(id: string, dto: UpdateCategoryDto) {
-    await this.findOne(id);
+  async update(id: string, dto: UpdateCategoryDto, tenantId?: string) {
+    await this.findOne(id, tenantId);
     return this.prisma.category.update({ where: { id }, data: dto });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, tenantId?: string) {
+    await this.findOne(id, tenantId);
     return this.prisma.category.delete({ where: { id } });
   }
 }
