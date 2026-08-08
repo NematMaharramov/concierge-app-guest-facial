@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum Role {
+  SUPER_ADMIN
   ADMIN
   CONCIERGE
 }
@@ -20,6 +21,50 @@ enum ReservationStatus {
   COMPLETED
 }
 
+// ─── Business Vertical Templates (Part 2) ──────────────────────
+// A vertical is a "starter kit" of categories (+ later, filter groups —
+// see Part 3) for a type of hospitality business. When a new Tenant is
+// created for a given vertical, CategoryTemplate rows for that vertical
+// are copied into real, tenant-owned Category rows.
+enum BusinessVertical {
+  RESORT_LEISURE
+  BUSINESS_CITY_HOTEL
+  BOUTIQUE_HOTEL
+  CUSTOM
+}
+
+model CategoryTemplate {
+  id          String   @id @default(uuid())
+  vertical    BusinessVertical
+  name        String
+  slug        String
+  icon        String?
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  filterGroups FilterGroupTemplate[]
+
+  @@unique([vertical, slug])
+}
+
+// Lightweight template for a category's sub-filters (e.g. "Cuisine Type").
+// `options` is a plain JSON string array at the template stage — it only
+// becomes real, queryable FilterGroup/FilterOption rows once a tenant is
+// instantiated (see Part 3, which defines those relational models and the
+// copy step that consumes this template).
+model FilterGroupTemplate {
+  id                 String   @id @default(uuid())
+  categoryTemplateId String
+  name               String
+  options            Json
+  isRequired         Boolean  @default(false)
+  sortOrder          Int      @default(0)
+
+  categoryTemplate CategoryTemplate @relation(fields: [categoryTemplateId], references: [id], onDelete: Cascade)
+}
+
 // ─── Multi-tenancy (Part 1) ─────────────────────────────────────
 // tenantId is nullable on purpose: schema changes must stay backward
 // compatible with `prisma db push` against a live database that already
@@ -27,12 +72,13 @@ enum ReservationStatus {
 // existing rows with a default "Demo Tenant" before we ever tighten this
 // to NOT NULL in a later Part.
 model Tenant {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String            @id @default(uuid())
+  name             String
+  slug             String            @unique
+  businessVertical BusinessVertical?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   branding     TenantBranding?
   users        User[]

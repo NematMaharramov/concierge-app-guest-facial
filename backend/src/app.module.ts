@@ -9,12 +9,14 @@ import { MediaModule } from './media/media.module';
 import { SettingsModule } from './settings/settings.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TenantsModule } from './tenants/tenants.module';
+import { CategoryTemplatesModule } from './category-templates/category-templates.module';
 import { TenantContextMiddleware } from './tenants/tenant-context.middleware';
 
 @Module({
   imports: [
     PrismaModule,
     TenantsModule,
+    CategoryTemplatesModule,
     AuthModule,
     UsersModule,
     CategoriesModule,
