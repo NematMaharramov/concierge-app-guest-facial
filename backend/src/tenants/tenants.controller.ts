@@ -1,6 +1,6 @@
-import { Controller, Get, Param, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
-import { TenantsService } from './tenants.service';
+import { TenantsService, CreateTenantDto } from './tenants.service';
 import { JwtAuthGuard, RolesGuard, Roles } from '../auth/guards';
 
 @Controller('tenants')
@@ -17,15 +17,22 @@ export class TenantsController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('SUPER_ADMIN')
   findAll() {
     return this.tenantsService.findAll();
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('SUPER_ADMIN')
   findOne(@Param('id') id: string) {
     return this.tenantsService.findById(id);
+  }
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  create(@Body() dto: CreateTenantDto) {
+    return this.tenantsService.create(dto);
   }
 }
