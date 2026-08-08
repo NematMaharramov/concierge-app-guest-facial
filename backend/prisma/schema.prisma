@@ -135,10 +135,57 @@ model Category {
 
   tenant      Tenant?   @relation(fields: [tenantId], references: [id])
   services    Service[]
+  filterGroups FilterGroup[]
 
   @@unique([tenantId, slug])
   @@unique([tenantId, name])
   @@index([tenantId])
+}
+
+// ─── Facet / Filter system (Part 3) ─────────────────────────────
+// A Category can optionally have one or more FilterGroups (e.g. "Cuisine
+// Type" on Restaurants). If a category has none, the guest site renders a
+// plain list — the frontend detects this automatically rather than
+// special-casing categories by slug. FilterGroups are either copied in
+// from a CategoryTemplate at tenant-creation time (Part 2), or created by
+// hand by a tenant ADMIN (not restricted to template-provided groups).
+model FilterGroup {
+  id         String   @id @default(uuid())
+  tenantId   String?
+  categoryId String
+  name       String
+  isRequired Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  options  FilterOption[]
+
+  @@index([tenantId])
+  @@index([categoryId])
+}
+
+model FilterOption {
+  id            String   @id @default(uuid())
+  filterGroupId String
+  label         String
+  sortOrder     Int      @default(0)
+
+  filterGroup FilterGroup          @relation(fields: [filterGroupId], references: [id], onDelete: Cascade)
+  services    ServiceFilterValue[]
+}
+
+// Many-to-many: a service can match more than one option in the same
+// group (e.g. a restaurant that's both "Japanese" and "Fusion").
+model ServiceFilterValue {
+  serviceId      String
+  filterOptionId String
+
+  service      Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  filterOption FilterOption @relation(fields: [filterOptionId], references: [id], onDelete: Cascade)
+
+  @@id([serviceId, filterOptionId])
 }
 
 model Service {
@@ -162,6 +209,7 @@ model Service {
   category      Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   images        ServiceImage[]
   reservations  Reservation[]
+  filterValues  ServiceFilterValue[]
 
   @@index([tenantId])
 }

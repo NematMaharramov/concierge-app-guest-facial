@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { getAllCategories, createCategory, updateCategory, deleteCategory, uploadCategoryPhoto } from '@/lib/api';
+import { getAllCategories, createCategory, updateCategory, deleteCategory, uploadCategoryPhoto, getFilterGroups, createFilterGroup, deleteFilterGroup, addFilterOption, deleteFilterOption } from '@/lib/api';
 import { ImageUploadButton } from '@/components/ImageUploadButton';
 import { CROP_PRESETS } from '@/lib/imageUtils';
 import toast from 'react-hot-toast';
@@ -11,6 +11,98 @@ const emptyForm = { name: '', slug: '', description: '', icon: '', sortOrder: 0,
 function resolveUrl(url?: string) {
   if (!url) return undefined;
   return url.startsWith('http') ? url : `${API_BASE}${url}`;
+}
+
+// ── Filter groups manager (Part 3) — shown inside the edit modal ────────────
+function FilterGroupsManager({ categoryId }: { categoryId: string }) {
+  const [groups, setGroups] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupOptions, setNewGroupOptions] = useState('');
+  const [newOptionByGroup, setNewOptionByGroup] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  const load = () => getFilterGroups(categoryId).then(setGroups).finally(() => setLoading(false));
+  useEffect(() => { load(); }, [categoryId]);
+
+  const handleAddGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGroupName.trim()) return;
+    setSaving(true);
+    try {
+      const options = newGroupOptions.split(',').map(o => o.trim()).filter(Boolean);
+      await createFilterGroup(categoryId, { name: newGroupName.trim(), options });
+      setNewGroupName(''); setNewGroupOptions('');
+      toast.success('Filter group added');
+      load();
+    } catch { toast.error('Failed to add filter group'); }
+    finally { setSaving(false); }
+  };
+
+  const handleDeleteGroup = async (id: string) => {
+    if (!confirm('Delete this filter group and all its options?')) return;
+    try { await deleteFilterGroup(id); toast.success('Deleted'); load(); }
+    catch { toast.error('Failed to delete'); }
+  };
+
+  const handleAddOption = async (groupId: string) => {
+    const label = (newOptionByGroup[groupId] || '').trim();
+    if (!label) return;
+    try {
+      await addFilterOption(groupId, { label });
+      setNewOptionByGroup(m => ({ ...m, [groupId]: '' }));
+      load();
+    } catch { toast.error('Failed to add option'); }
+  };
+
+  const handleDeleteOption = async (id: string) => {
+    try { await deleteFilterOption(id); load(); }
+    catch { toast.error('Failed to remove option'); }
+  };
+
+  return (
+    <div className="space-y-3">
+      {loading ? (
+        <p className="text-xs text-charcoal-400">Loading filter groups…</p>
+      ) : groups.length === 0 ? (
+        <p className="text-xs text-charcoal-400">No filter groups yet. Guests will see a plain list for this category.</p>
+      ) : (
+        groups.map(group => (
+          <div key={group.id} className="border border-charcoal-100 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-charcoal-900">{group.name}</p>
+              <button type="button" onClick={() => handleDeleteGroup(group.id)} className="text-red-400 hover:text-red-600 text-[10px] tracking-widest uppercase">Delete group</button>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {group.options.map((opt: any) => (
+                <span key={opt.id} className="flex items-center gap-1 bg-charcoal-50 border border-charcoal-100 px-2 py-1 text-xs text-charcoal-700">
+                  {opt.label}
+                  <button type="button" onClick={() => handleDeleteOption(opt.id)} className="text-charcoal-400 hover:text-red-500">✕</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={newOptionByGroup[group.id] || ''}
+                onChange={e => setNewOptionByGroup(m => ({ ...m, [group.id]: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddOption(group.id); } }}
+                className="input-field text-xs py-1.5"
+                placeholder="New option (e.g. Japanese)"
+              />
+              <button type="button" onClick={() => handleAddOption(group.id)} className="btn-ghost text-[10px] px-3">Add</button>
+            </div>
+          </div>
+        ))
+      )}
+
+      <form onSubmit={handleAddGroup} className="border border-dashed border-charcoal-300 p-3 space-y-2">
+        <p className="text-[10px] tracking-widest uppercase text-charcoal-500">Add a new filter group</p>
+        <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} className="input-field text-xs py-1.5" placeholder="Group name (e.g. Cuisine Type)" />
+        <input value={newGroupOptions} onChange={e => setNewGroupOptions(e.target.value)} className="input-field text-xs py-1.5" placeholder="Options, comma separated (e.g. Italian, Japanese, Local)" />
+        <button type="submit" disabled={saving} className="btn-ghost text-[10px] px-3">{saving ? 'Adding…' : '+ Add Group'}</button>
+      </form>
+    </div>
+  );
 }
 
 export default function AdminCategoriesPage() {
@@ -168,6 +260,14 @@ export default function AdminCategoriesPage() {
                 <button type="button" onClick={() => setModal(null)} className="btn-ghost flex-1">Cancel</button>
               </div>
             </form>
+
+            {/* Filter groups (Part 3) — only manageable once the category exists */}
+            {modal === 'edit' && selected && (
+              <div className="px-6 pb-6">
+                <label className="label">Filter Groups <span className="text-charcoal-400 normal-case tracking-normal font-normal">(guest-site chip filters, e.g. Cuisine Type)</span></label>
+                <FilterGroupsManager categoryId={selected.id} />
+              </div>
+            )}
           </div>
         </div>
       )}

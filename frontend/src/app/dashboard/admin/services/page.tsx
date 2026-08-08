@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
-import { api, getAllServices, getAllCategories, createService, updateService, deleteService, deleteImage } from '@/lib/api';
+import { api, getAllServices, getAllCategories, createService, updateService, deleteService, deleteImage, getFilterGroups } from '@/lib/api';
 import { cropAndResize, CROP_PRESETS } from '@/lib/imageUtils';
 import toast from 'react-hot-toast';
 
@@ -16,6 +16,10 @@ export default function AdminServicesPage() {
   const [form, setForm] = useState<any>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [filterCat, setFilterCat] = useState('ALL');
+  // Part 3: filter groups belonging to the currently-selected category in
+  // the create/edit form, and which of their options this service matches.
+  const [formFilterGroups, setFormFilterGroups] = useState<any[]>([]);
+  const [selectedFilterOptionIds, setSelectedFilterOptionIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<File[]>([]);
   const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
@@ -27,11 +31,24 @@ export default function AdminServicesPage() {
 
   useEffect(() => { load(); }, []);
 
-  const openCreate = () => { setForm(emptyForm); setModal('create'); };
+  const openCreate = () => { setForm(emptyForm); setSelectedFilterOptionIds([]); setModal('create'); };
   const openEdit = (svc: any) => {
     setSelected(svc);
     setForm({ categoryId: svc.categoryId, name: svc.name, description: svc.description || '', priceInfo: svc.priceInfo || '', priceAmount: svc.priceAmount || '', priceCurrency: svc.priceCurrency || 'EUR', contactName: svc.contactName || '', contactPhone: svc.contactPhone || '', sortOrder: svc.sortOrder, isVisible: svc.isVisible });
+    setSelectedFilterOptionIds((svc.filterValues || []).map((fv: any) => fv.filterOptionId));
     setModal('edit');
+  };
+
+  // Load the selected category's filter groups whenever it changes while
+  // the create/edit modal is open — lets the admin tag this service into
+  // the right facets (e.g. Cuisine Type: Japanese).
+  useEffect(() => {
+    if ((modal !== 'create' && modal !== 'edit') || !form.categoryId) { setFormFilterGroups([]); return; }
+    getFilterGroups(form.categoryId).then(setFormFilterGroups).catch(() => setFormFilterGroups([]));
+  }, [modal, form.categoryId]);
+
+  const toggleFilterOption = (optionId: string) => {
+    setSelectedFilterOptionIds(ids => ids.includes(optionId) ? ids.filter(i => i !== optionId) : [...ids, optionId]);
   };
   const openImages = (svc: any) => {
     setSelected(svc);
@@ -43,7 +60,7 @@ export default function AdminServicesPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
     try {
-      const data = { ...form, priceAmount: form.priceAmount ? Number(form.priceAmount) : undefined, sortOrder: Number(form.sortOrder) };
+      const data = { ...form, priceAmount: form.priceAmount ? Number(form.priceAmount) : undefined, sortOrder: Number(form.sortOrder), filterOptionIds: selectedFilterOptionIds };
       if (modal === 'create') await createService(data);
       else await updateService(selected.id, data);
       toast.success(modal === 'create' ? 'Service created' : 'Service updated');
@@ -197,6 +214,26 @@ export default function AdminServicesPage() {
                 <label className="label">Service Name</label>
                 <input required value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} className="input-field" />
               </div>
+
+              {/* Part 3: facet tagging — only shown if the category has filter groups */}
+              {formFilterGroups.length > 0 && (
+                <div className="space-y-2">
+                  <label className="label">Filters</label>
+                  {formFilterGroups.map(group => (
+                    <div key={group.id} className="mb-2">
+                      <p className="text-xs text-charcoal-500 mb-1">{group.name}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {group.options.map((opt: any) => (
+                          <label key={opt.id} className={`flex items-center gap-1.5 px-2.5 py-1 text-xs border cursor-pointer transition-colors ${selectedFilterOptionIds.includes(opt.id) ? 'border-gold-400 bg-gold-50 text-gold-700' : 'border-charcoal-200 text-charcoal-600'}`}>
+                            <input type="checkbox" className="hidden" checked={selectedFilterOptionIds.includes(opt.id)} onChange={() => toggleFilterOption(opt.id)} />
+                            {opt.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div>
                 <label className="label">Description</label>
                 <textarea rows={3} value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))} className="input-field resize-none" />
