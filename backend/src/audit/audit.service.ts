@@ -6,6 +6,7 @@ export class AuditService {
   constructor(private prisma: PrismaService) {}
 
   log(data: {
+    tenantId?: string;
     userId: string;
     action: string;
     entityType: string;
@@ -17,9 +18,12 @@ export class AuditService {
     return this.prisma.auditLog.create({ data });
   }
 
-  findAll(reservationId?: string) {
+  findAll(reservationId?: string, tenantId?: string) {
     return this.prisma.auditLog.findMany({
-      where: reservationId ? { reservationId } : {},
+      where: {
+        ...(reservationId ? { reservationId } : {}),
+        ...(tenantId ? { tenantId } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       include: { user: { select: { name: true, email: true, role: true } } },
       take: 500,

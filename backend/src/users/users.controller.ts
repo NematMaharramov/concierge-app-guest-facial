@@ -37,17 +37,17 @@ export class UsersController {
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  findAll() { return this.usersService.findAll(); }
+  findAll(@Request() req: any) { return this.usersService.findAll(req.user?.tenantId); }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  findOne(@Param('id') id: string) { return this.usersService.findOne(id); }
+  findOne(@Param('id') id: string, @Request() req: any) { return this.usersService.findOne(id, req.user?.tenantId); }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  create(@Body() dto: CreateUserDto) { return this.usersService.create(dto); }
+  create(@Body() dto: CreateUserDto, @Request() req: any) { return this.usersService.create(dto, req.user?.tenantId); }
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -4,36 +4,47 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
+  // ── Tenant (Part 1: multi-tenancy infra) ───────────────────────
+  // The existing Raffles Praslin data becomes the demo tenant's data —
+  // it is no longer "the" data, just the first tenant's data.
+  const DEFAULT_TENANT_SLUG = process.env.DEFAULT_TENANT_SLUG || 'raffles-praslin';
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: DEFAULT_TENANT_SLUG },
+    update: {},
+    create: { name: 'Raffles Praslin (Demo)', slug: DEFAULT_TENANT_SLUG },
+  });
+  console.log(`🏢 Using tenant: ${tenant.name} (${tenant.id})`);
+
   console.log('🧹 Cleaning existing data...');
-  await prisma.auditLog.deleteMany();
-  await prisma.reservation.deleteMany();
-  await prisma.serviceImage.deleteMany();
-  await prisma.service.deleteMany();
-  await prisma.category.deleteMany();
+  await prisma.auditLog.deleteMany({ where: { tenantId: tenant.id } });
+  await prisma.reservation.deleteMany({ where: { tenantId: tenant.id } });
+  await prisma.serviceImage.deleteMany({ where: { service: { tenantId: tenant.id } } });
+  await prisma.service.deleteMany({ where: { tenantId: tenant.id } });
+  await prisma.category.deleteMany({ where: { tenantId: tenant.id } });
   await prisma.siteSettings.deleteMany();
   console.log('✅ Clean complete, seeding...');
 
   const adminPassword = await bcrypt.hash('Admin@2024!', 10);
   await prisma.user.upsert({
     where: { email: 'admin@raffles-concierge.com' },
-    update: {},
-    create: { email: 'admin@raffles-concierge.com', password: adminPassword, name: 'Administrator', role: Role.ADMIN },
+    update: { tenantId: tenant.id },
+    create: { tenantId: tenant.id, email: 'admin@raffles-concierge.com', password: adminPassword, name: 'Administrator', role: Role.ADMIN },
   });
 
   const conciergePassword = await bcrypt.hash('Concierge@2024!', 10);
   await prisma.user.upsert({
     where: { email: 'concierge@raffles-concierge.com' },
-    update: {},
-    create: { email: 'concierge@raffles-concierge.com', password: conciergePassword, name: 'Concierge Staff', role: Role.CONCIERGE },
+    update: { tenantId: tenant.id },
+    create: { tenantId: tenant.id, email: 'concierge@raffles-concierge.com', password: conciergePassword, name: 'Concierge Staff', role: Role.CONCIERGE },
   });
 
   // ── Categories ──────────────────────────────────────────────────
-  const taxiCat = await prisma.category.create({ data: { name: 'Taxi & Transfers', slug: 'taxi-transfers', description: 'Private taxi and transfer services across Praslin and neighbouring islands', sortOrder: 1, icon: '🚗' } });
-  const boatCat = await prisma.category.create({ data: { name: 'Boat Excursions', slug: 'boat-excursions', description: 'Private and group boat trips, island hopping and fishing charters', sortOrder: 2, icon: '⛵' } });
-  const catamaranCat = await prisma.category.create({ data: { name: 'Catamaran & Large Vessels', slug: 'catamaran', description: 'Luxury catamaran charters for larger groups', sortOrder: 3, icon: '🛥️' } });
-  const carRentalCat = await prisma.category.create({ data: { name: 'Car Rental', slug: 'car-rental', description: 'Self-drive car and mini moke rental including insurance', sortOrder: 4, icon: '🔑' } });
-  const golfCat = await prisma.category.create({ data: { name: 'Golf', slug: 'golf', description: 'Golf at Constance Lemuria — fees paid directly by guest', sortOrder: 5, icon: '⛳' } });
-  const helicopterCat = await prisma.category.create({ data: { name: 'Helicopter Transfers', slug: 'helicopter', description: 'Scenic and inter-island helicopter flights via Zil Air', sortOrder: 6, icon: '🚁' } });
+  const taxiCat = await prisma.category.create({ data: { tenantId: tenant.id, name: 'Taxi & Transfers', slug: 'taxi-transfers', description: 'Private taxi and transfer services across Praslin and neighbouring islands', sortOrder: 1, icon: '🚗' } });
+  const boatCat = await prisma.category.create({ data: { tenantId: tenant.id, name: 'Boat Excursions', slug: 'boat-excursions', description: 'Private and group boat trips, island hopping and fishing charters', sortOrder: 2, icon: '⛵' } });
+  const catamaranCat = await prisma.category.create({ data: { tenantId: tenant.id, name: 'Catamaran & Large Vessels', slug: 'catamaran', description: 'Luxury catamaran charters for larger groups', sortOrder: 3, icon: '🛥️' } });
+  const carRentalCat = await prisma.category.create({ data: { tenantId: tenant.id, name: 'Car Rental', slug: 'car-rental', description: 'Self-drive car and mini moke rental including insurance', sortOrder: 4, icon: '🔑' } });
+  const golfCat = await prisma.category.create({ data: { tenantId: tenant.id, name: 'Golf', slug: 'golf', description: 'Golf at Constance Lemuria — fees paid directly by guest', sortOrder: 5, icon: '⛳' } });
+  const helicopterCat = await prisma.category.create({ data: { tenantId: tenant.id, name: 'Helicopter Transfers', slug: 'helicopter', description: 'Scenic and inter-island helicopter flights via Zil Air', sortOrder: 6, icon: '🚁' } });
 
   // ── Taxi Services ────────────────────────────────────────────────
   await prisma.service.createMany({ data: [
@@ -51,7 +62,7 @@ async function main() {
     { categoryId: taxiCat.id, name: 'HIACE to Airport (up to 12 pax)', contactName: 'MCTOUR', contactPhone: '2535389', description: 'Private HiAce minibus transfer to Praslin Airport for groups up to 12 passengers.', priceInfo: '€110 one way / €220 return', priceAmount: 110, priceCurrency: 'EUR', sortOrder: 12 },
     { categoryId: taxiCat.id, name: 'HIACE Full Day Tour (7 hrs)', contactName: 'MCTOUR', contactPhone: '2535389', description: 'Full-day group island tour by HiAce minibus, up to 12 pax.', priceInfo: '€290 per vehicle', priceAmount: 290, priceCurrency: 'EUR', sortOrder: 13 },
     { categoryId: taxiCat.id, name: 'HIACE Half Day Tour (4 hrs)', contactName: 'MCTOUR', contactPhone: '2535389', description: 'Half-day group island tour by HiAce minibus, up to 12 pax.', priceInfo: '€200 per vehicle', priceAmount: 200, priceCurrency: 'EUR', sortOrder: 14 },
-  ]});
+  ].map(d => ({ ...d, tenantId: tenant.id })) });
 
   // ── Boat Excursions ──────────────────────────────────────────────
   await prisma.service.createMany({ data: [
@@ -75,7 +86,7 @@ async function main() {
     { categoryId: boatCat.id, name: 'Aride Island – Summer Dream (6 pax)', contactName: 'Michel / Bernadette', contactPhone: '2535389 / 2525310', description: 'Day trip to Aride Island nature reserve for up to 6 passengers.', priceInfo: '€500', priceAmount: 500, priceCurrency: 'EUR', sortOrder: 18 },
     { categoryId: boatCat.id, name: 'Full Day Fishing – Summer Dream (6 pax)', contactName: 'Michel / Bernadette', contactPhone: '2535389 / 2525310', description: 'Full-day deep-sea fishing on the Summer Dream for up to 6 passengers.', priceInfo: '€1,000', priceAmount: 1000, priceCurrency: 'EUR', sortOrder: 19 },
     { categoryId: boatCat.id, name: 'Half Day Fishing – Summer Dream (6 pax)', contactName: 'Michel / Bernadette', contactPhone: '2535389 / 2525310', description: 'Half-day fishing on the Summer Dream for up to 6 passengers.', priceInfo: '€900', priceAmount: 900, priceCurrency: 'EUR', sortOrder: 20 },
-  ]});
+  ].map(d => ({ ...d, tenantId: tenant.id })) });
 
   // ── Catamaran ────────────────────────────────────────────────────
   await prisma.service.createMany({ data: [
@@ -92,7 +103,7 @@ async function main() {
     { categoryId: catamaranCat.id, name: 'Summer Cruz – Full Day Fishing (15 pax)', contactName: 'Michel / Bernadette', contactPhone: '2535389 / 2525310', description: 'Full-day fishing on the Summer Cruz for up to 15 passengers.', priceInfo: '€5,000', priceAmount: 5000, priceCurrency: 'EUR', sortOrder: 11 },
     { categoryId: catamaranCat.id, name: 'Catamaran – Endless Summer Charter (14 pax)', contactName: 'Jurgen', contactPhone: '2711689', description: 'Catamaran charter — book 24h in advance. Up to 14 passengers.', priceInfo: '€1,500', priceAmount: 1500, priceCurrency: 'EUR', sortOrder: 12 },
     { categoryId: catamaranCat.id, name: 'Catamaran – Island Cat Charter (16 pax)', contactName: 'Joel', contactPhone: '2514034', description: 'Island Cat catamaran charter — book 24h in advance. Up to 16 passengers.', priceInfo: '€1,500', priceAmount: 1500, priceCurrency: 'EUR', sortOrder: 13 },
-  ]});
+  ].map(d => ({ ...d, tenantId: tenant.id })) });
 
   // ── Car Rental ───────────────────────────────────────────────────
   await prisma.service.createMany({ data: [
@@ -101,7 +112,7 @@ async function main() {
     { categoryId: carRentalCat.id, name: 'Medium Car – Daily Rental', contactName: 'Capricorn / Kenny', contactPhone: '+248 2 581 110 / +248 2788700', description: 'Medium car rental including full insurance.', priceInfo: '€100 / day', priceAmount: 100, priceCurrency: 'EUR', sortOrder: 3 },
     { categoryId: carRentalCat.id, name: 'Deluxe Car – Daily Rental', contactName: 'Capricorn / Kenny', contactPhone: '+248 2 581 110 / +248 2788700', description: 'Deluxe car rental including full insurance.', priceInfo: '€100 / day', priceAmount: 100, priceCurrency: 'EUR', sortOrder: 4 },
     { categoryId: carRentalCat.id, name: '7-Seater – Daily Rental', contactName: 'Capricorn / Kenny', contactPhone: '+248 2 581 110 / +248 2788700', description: '7-seater vehicle rental including full insurance.', priceInfo: '€125 / day', priceAmount: 125, priceCurrency: 'EUR', sortOrder: 5 },
-  ]});
+  ].map(d => ({ ...d, tenantId: tenant.id })) });
 
   // ── Golf ─────────────────────────────────────────────────────────
   await prisma.service.createMany({ data: [
@@ -109,7 +120,7 @@ async function main() {
     { categoryId: golfCat.id, name: 'Golf – 9 Holes', contactName: 'Constance Lemuria', contactPhone: '4281281', description: '9-hole golf at Constance Lemuria. Guest pays directly.', priceInfo: '2,200 SCR per round', priceAmount: 2200, priceCurrency: 'SCR', sortOrder: 2 },
     { categoryId: golfCat.id, name: 'Driving Range – Grade A (10 balls)', contactName: 'Constance Lemuria', contactPhone: '4281281', description: 'Driving range practice — 10 balls, Grade A.', priceInfo: '350 SCR', priceAmount: 350, priceCurrency: 'SCR', sortOrder: 3 },
     { categoryId: golfCat.id, name: 'Driving Range – Grade B (10 balls)', contactName: 'Constance Lemuria', contactPhone: '4281281', description: 'Driving range practice — 10 balls, Grade B.', priceInfo: '250 SCR', priceAmount: 250, priceCurrency: 'SCR', sortOrder: 4 },
-  ]});
+  ].map(d => ({ ...d, tenantId: tenant.id })) });
 
   // ── Helicopter ───────────────────────────────────────────────────
   await prisma.service.createMany({ data: [
@@ -127,7 +138,7 @@ async function main() {
     { categoryId: helicopterCat.id, name: '15 Min Scenic Flight', contactName: 'Zil Air', contactPhone: '4375100', description: 'Breathtaking 15-minute scenic helicopter flight over the islands.', priceInfo: '€1,168', priceAmount: 1168, priceCurrency: 'EUR', sortOrder: 12 },
     { categoryId: helicopterCat.id, name: '30 Min Scenic Flight', contactName: 'Zil Air', contactPhone: '4375100', description: 'Extended 30-minute scenic helicopter flight over the Seychelles archipelago.', priceInfo: '€2,336', priceAmount: 2336, priceCurrency: 'EUR', sortOrder: 13 },
     { categoryId: helicopterCat.id, name: 'Air Seychelles Charter – Mahé to Praslin', contactName: 'Air Seychelles', contactPhone: '4391477', description: 'Private charter plane from Mahé to Praslin Airport. Night surcharge 15% (18:30–06:00).', priceInfo: '€4,000', priceAmount: 4000, priceCurrency: 'EUR', sortOrder: 14 },
-  ]});
+  ].map(d => ({ ...d, tenantId: tenant.id })) });
 
   // ── Site Settings ────────────────────────────────────────────────
   // Using upsert so re-running seed doesn't duplicate rows.

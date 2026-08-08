@@ -8,6 +8,7 @@ interface User {
   name: string;
   role: 'ADMIN' | 'CONCIERGE';
   profilePhoto?: string;
+  tenantId?: string | null;
 }
 interface AuthCtx {
   user: User | null;
