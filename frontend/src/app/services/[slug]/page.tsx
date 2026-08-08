@@ -91,6 +91,8 @@ export default function CategoryPage() {
   const [selectedService, setSelectedService] = useState<any>(null);
   const [fullscreenImages, setFullscreenImages] = useState<string[] | null>(null);
   const [fullscreenStart, setFullscreenStart] = useState(0);
+  // Part 3: one selected option per filter group (or 'ALL'). Keyed by filterGroupId.
+  const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!slug) return;
@@ -118,6 +120,24 @@ export default function CategoryPage() {
     if (!service?.images?.length) return [];
     return service.images.map((img: any) => `${API_BASE}${img.url}`);
   };
+
+  // Part 3: chip-style facet filtering. A category may have zero or more
+  // FilterGroups (e.g. "Cuisine Type", "Duration"). If none exist, this is
+  // a no-op and every service always matches — the guest sees the plain
+  // list exactly as before, no special-casing needed per category.
+  const filterGroups: any[] = category?.filterGroups || [];
+
+  const setGroupFilter = (groupId: string, optionId: string) => {
+    setActiveFilters(f => ({ ...f, [groupId]: optionId }));
+  };
+
+  const visibleServices = (category?.services || []).filter((service: any) => {
+    return filterGroups.every(group => {
+      const selected = activeFilters[group.id];
+      if (!selected || selected === 'ALL') return true;
+      return (service.filterValues || []).some((fv: any) => fv.filterOptionId === selected);
+    });
+  });
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#fafaf8]">
@@ -181,8 +201,50 @@ export default function CategoryPage() {
 
       {/* Services grid */}
       <div className="max-w-7xl mx-auto px-6 py-12">
+        {/* Facet filter chips (Part 3) — one row per filter group, only
+            rendered when the category actually has filter groups. */}
+        {filterGroups.length > 0 && (
+          <div className="mb-8 space-y-3">
+            {filterGroups.map(group => {
+              const active = activeFilters[group.id] || 'ALL';
+              return (
+                <div key={group.id} className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] tracking-[0.3em] uppercase text-charcoal-400 mr-1">{group.name}</span>
+                  <button
+                    onClick={() => setGroupFilter(group.id, 'ALL')}
+                    className="px-3.5 py-1.5 text-xs tracking-wide transition-colors rounded-full border"
+                    style={active === 'ALL'
+                      ? { background: primary, color: 'white', borderColor: primary }
+                      : { background: 'white', color: '#4a4a4a', borderColor: '#e0e0e0' }}
+                  >
+                    All
+                  </button>
+                  {group.options.map((opt: any) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setGroupFilter(group.id, opt.id)}
+                      className="px-3.5 py-1.5 text-xs tracking-wide transition-colors rounded-full border"
+                      style={active === opt.id
+                        ? { background: accent, color: 'white', borderColor: accent }
+                        : { background: 'white', color: '#4a4a4a', borderColor: '#e0e0e0' }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {visibleServices.length === 0 && (
+          <div className="text-center py-16">
+            <p className="text-charcoal-400 text-sm">No services match the selected filters.</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {category.services.map((service: any) => {
+          {visibleServices.map((service: any) => {
             const serviceImages = getServiceImages(service);
             return (
               <div key={service.id} className="card cursor-pointer group hover:shadow-xl transition-all duration-300 animate-slide-up bg-white" onClick={() => setSelectedService(service)}>

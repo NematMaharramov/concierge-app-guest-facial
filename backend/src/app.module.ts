@@ -10,6 +10,7 @@ import { SettingsModule } from './settings/settings.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { CategoryTemplatesModule } from './category-templates/category-templates.module';
+import { FilterGroupsModule } from './filter-groups/filter-groups.module';
 import { TenantContextMiddleware } from './tenants/tenant-context.middleware';
 
 @Module({
@@ -17,6 +18,7 @@ import { TenantContextMiddleware } from './tenants/tenant-context.middleware';
     PrismaModule,
     TenantsModule,
     CategoryTemplatesModule,
+    FilterGroupsModule,
     AuthModule,
     UsersModule,
     CategoriesModule,

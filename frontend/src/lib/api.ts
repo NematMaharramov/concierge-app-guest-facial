@@ -73,6 +73,19 @@ export const uploadImages = (serviceId: string, files: FileList) => {
 };
 export const deleteImage = (imageId: string) => api.delete(`/media/images/${imageId}`).then(r => r.data);
 
+// ── Filter groups / facets (Part 3) ───────────────────────────
+export const getFilterGroups = (categoryId: string) => api.get(`/categories/${categoryId}/filter-groups`).then(r => r.data);
+export const createFilterGroup = (categoryId: string, data: { name: string; isRequired?: boolean; sortOrder?: number; options?: string[] }) =>
+  api.post(`/categories/${categoryId}/filter-groups`, data).then(r => r.data);
+export const updateFilterGroup = (id: string, data: { name?: string; isRequired?: boolean; sortOrder?: number }) =>
+  api.put(`/filter-groups/${id}`, data).then(r => r.data);
+export const deleteFilterGroup = (id: string) => api.delete(`/filter-groups/${id}`).then(r => r.data);
+export const addFilterOption = (filterGroupId: string, data: { label: string; sortOrder?: number }) =>
+  api.post(`/filter-groups/${filterGroupId}/options`, data).then(r => r.data);
+export const updateFilterOption = (id: string, data: { label?: string; sortOrder?: number }) =>
+  api.put(`/filter-options/${id}`, data).then(r => r.data);
+export const deleteFilterOption = (id: string) => api.delete(`/filter-options/${id}`).then(r => r.data);
+
 // ── Admin: Users ─────────────────────────────────────────────
 export const getUsers = () => api.get('/users').then(r => r.data);
 export const createUser = (data: any) => api.post('/users', data).then(r => r.data);

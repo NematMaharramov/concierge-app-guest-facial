@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { IsString, IsOptional, IsBoolean, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsNumber, IsArray } from 'class-validator';
 
 export class CreateServiceDto {
   @IsString() categoryId: string;
@@ -14,6 +14,7 @@ export class CreateServiceDto {
   @IsOptional() details?: any;
   @IsNumber() @IsOptional() sortOrder?: number;
   @IsBoolean() @IsOptional() isVisible?: boolean;
+  @IsArray() @IsOptional() filterOptionIds?: string[];
 }
 
 export class UpdateServiceDto {
@@ -28,6 +29,7 @@ export class UpdateServiceDto {
   @IsOptional() details?: any;
   @IsNumber() @IsOptional() sortOrder?: number;
   @IsBoolean() @IsOptional() isVisible?: boolean;
+  @IsArray() @IsOptional() filterOptionIds?: string[];
 }
 
 @Injectable()
@@ -45,6 +47,7 @@ export class ServicesService {
       include: {
         category: true,
         images: { orderBy: { sortOrder: 'asc' } },
+        filterValues: true,
       },
     });
   }
@@ -55,6 +58,7 @@ export class ServicesService {
       include: {
         category: true,
         images: { orderBy: { sortOrder: 'asc' } },
+        filterValues: true,
       },
     });
     if (!service) throw new NotFoundException('Service not found');
@@ -77,9 +81,17 @@ export class ServicesService {
       );
     }
 
+    const { filterOptionIds, ...data } = dto;
+
     return this.prisma.service.create({
-      data: { ...dto, ...(tenantId ? { tenantId } : {}) },
-      include: { category: true, images: true },
+      data: {
+        ...data,
+        ...(tenantId ? { tenantId } : {}),
+        ...(filterOptionIds?.length
+          ? { filterValues: { create: filterOptionIds.map((filterOptionId) => ({ filterOptionId })) } }
+          : {}),
+      },
+      include: { category: true, images: true, filterValues: true },
     });
   }
 
@@ -107,10 +119,24 @@ export class ServicesService {
       }
     }
 
-    return this.prisma.service.update({
+    const { filterOptionIds, ...data } = dto;
+
+    await this.prisma.service.update({ where: { id }, data });
+
+    // filterOptionIds undefined = "not touched by this request" (e.g. the
+    // basic edit form). An explicit [] clears all assignments.
+    if (filterOptionIds !== undefined) {
+      await this.prisma.serviceFilterValue.deleteMany({ where: { serviceId: id } });
+      if (filterOptionIds.length) {
+        await this.prisma.serviceFilterValue.createMany({
+          data: filterOptionIds.map((filterOptionId) => ({ serviceId: id, filterOptionId })),
+        });
+      }
+    }
+
+    return this.prisma.service.findUnique({
       where: { id },
-      data: dto,
-      include: { category: true, images: true },
+      include: { category: true, images: true, filterValues: true },
     });
   }
 

@@ -49,8 +49,9 @@ export class CategoriesService {
         services: {
           where: { isVisible: true },
           orderBy: { sortOrder: 'asc' },
-          include: { images: { orderBy: { sortOrder: 'asc' } } },
+          include: { images: { orderBy: { sortOrder: 'asc' } }, filterValues: true },
         },
+        filterGroups: { orderBy: { sortOrder: 'asc' }, include: { options: { orderBy: { sortOrder: 'asc' } } } },
       },
     });
     if (!cat) throw new NotFoundException('Category not found');
@@ -64,8 +65,9 @@ export class CategoriesService {
         services: {
           where: { isVisible: true },
           orderBy: { sortOrder: 'asc' },
-          include: { images: { orderBy: { sortOrder: 'asc' } } },
+          include: { images: { orderBy: { sortOrder: 'asc' } }, filterValues: true },
         },
+        filterGroups: { orderBy: { sortOrder: 'asc' }, include: { options: { orderBy: { sortOrder: 'asc' } } } },
       },
     });
     if (!cat) throw new NotFoundException('Category not found');
