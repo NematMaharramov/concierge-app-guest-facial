@@ -81,6 +81,7 @@ model Tenant {
   updatedAt        DateTime          @updatedAt
 
   branding     TenantBranding?
+  featureFlags TenantFeatureFlag[]
   users        User[]
   categories   Category[]
   services     Service[]
@@ -99,6 +100,23 @@ model TenantBranding {
   updatedAt    DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// Simple on/off switches per tenant for optional platform modules (e.g.
+// "excel_import", "monthly_events", "pre_arrival_letters", "taxi_directory").
+// Consumed by later Parts (9, etc.) — Part 7 only needs the Super Admin UI
+// to toggle these; nothing reads them yet, so unknown/default keys are
+// harmless.
+model TenantFeatureFlag {
+  id        String   @id @default(uuid())
+  tenantId  String
+  key       String
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
 }
 
 model User {

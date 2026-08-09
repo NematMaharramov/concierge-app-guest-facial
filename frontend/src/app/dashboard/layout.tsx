@@ -15,6 +15,7 @@ const navItems = [
   { href: '/dashboard/admin/categories', label: 'Categories', icon: '📁', adminOnly: true },
   { href: '/dashboard/admin/users', label: 'Users', icon: '👥', adminOnly: true },
   { href: '/dashboard/admin/settings', label: 'Settings', icon: '⚙️', adminOnly: true },
+  { href: '/dashboard/super-admin/tenants', label: 'Tenants', icon: '🏢', superAdminOnly: true },
 ];
 
 type SidebarTheme = 'dark' | 'light';
@@ -105,7 +106,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href);
 
-  const visibleNav = navItems.filter(item => !item.adminOnly || user.role === 'ADMIN');
+  const visibleNav = navItems.filter(item => {
+    // SUPER_ADMIN is a platform-level role with no tenant of its own — it
+    // only sees the Dashboard and Tenants management, never per-tenant
+    // operational pages (Reservations, Services, Categories, Users,
+    // Settings), matching the "Guest site ≠ Admin panel ≠ Super Admin
+    // panel" scope separation.
+    if (item.superAdminOnly) return user.role === 'SUPER_ADMIN';
+    if (user.role === 'SUPER_ADMIN') return item.href === '/dashboard';
+    if (item.adminOnly) return user.role === 'ADMIN';
+    return true;
+  });
   const t = THEMES[theme];
 
   const profilePhotoUrl = user.profilePhoto

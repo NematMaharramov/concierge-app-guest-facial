@@ -6,7 +6,7 @@ interface User {
   id: string;
   email: string;
   name: string;
-  role: 'ADMIN' | 'CONCIERGE';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'CONCIERGE';
   profilePhoto?: string;
   tenantId?: string | null;
 }

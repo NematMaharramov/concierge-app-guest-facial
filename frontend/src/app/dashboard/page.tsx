@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { getStats, getReservations } from '@/lib/api';
+import { getStats, getReservations, getTenants } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -252,10 +252,78 @@ function ConciergeDashboard({ userName }: { userName: string }) {
   );
 }
 
+// ── Super Admin Dashboard ──────────────────────────────────────────────────
+function SuperAdminDashboard() {
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getTenants().then(setTenants).finally(() => setLoading(false));
+  }, []);
+
+  const active = tenants.filter(t => t.isActive);
+
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <p className="text-xs tracking-[0.4em] uppercase text-gold-500 mb-1">Platform Overview</p>
+          <h1 className="font-display text-3xl font-light text-charcoal-900">Super Admin</h1>
+        </div>
+        <div className="flex items-center gap-2 bg-charcoal-900 px-4 py-2">
+          <span className="w-2 h-2 rounded-full bg-gold-400 animate-pulse" />
+          <span className="text-xs tracking-widest uppercase text-white font-medium">Platform Owner</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="bg-white border border-charcoal-100 p-5">
+          <p className="text-xs tracking-widest uppercase text-charcoal-400 mb-2">Total Tenants</p>
+          <p className="text-3xl font-light text-charcoal-900">{loading ? '—' : tenants.length}</p>
+        </div>
+        <div className="bg-white border border-charcoal-100 p-5">
+          <p className="text-xs tracking-widest uppercase text-charcoal-400 mb-2">Active</p>
+          <p className="text-3xl font-light text-emerald-600">{loading ? '—' : active.length}</p>
+        </div>
+      </div>
+
+      <div className="bg-white border border-charcoal-100">
+        <div className="px-6 py-4 border-b border-charcoal-100 flex items-center justify-between">
+          <h2 className="font-medium text-charcoal-900 tracking-wide">Tenants</h2>
+          <Link href="/dashboard/super-admin/tenants" className="text-xs tracking-widest uppercase text-gold-500 hover:text-gold-600 transition-colors">
+            Manage →
+          </Link>
+        </div>
+        <div className="divide-y divide-charcoal-50">
+          {loading ? (
+            <p className="text-charcoal-400 text-sm p-6 text-center">Loading…</p>
+          ) : tenants.length === 0 ? (
+            <div className="p-8 text-center">
+              <p className="text-charcoal-400 text-sm mb-4">No tenants yet.</p>
+              <Link href="/dashboard/super-admin/tenants" className="btn-primary text-xs">+ Create Tenant</Link>
+            </div>
+          ) : (
+            tenants.slice(0, 6).map(t => (
+              <div key={t.id} className="flex items-center gap-4 px-6 py-3.5">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.isActive ? 'bg-emerald-400' : 'bg-charcoal-300'}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-charcoal-900 truncate">{t.name}</p>
+                  <p className="text-xs text-charcoal-400 truncate">{t.slug}{t.businessVertical ? ` · ${t.businessVertical}` : ''}</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Export ────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user } = useAuth();
   if (!user) return null;
+  if (user.role === 'SUPER_ADMIN') return <SuperAdminDashboard />;
   if (user.role === 'ADMIN') return <AdminDashboard />;
   return <ConciergeDashboard userName={user.name} />;
 }
