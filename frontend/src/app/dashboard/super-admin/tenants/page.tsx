@@ -132,6 +132,7 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: any; onClose: (
   const [tab, setTab] = useState<'general' | 'branding' | 'flags'>('general');
 
   const [name, setName] = useState(tenant.name);
+  const [customDomain, setCustomDomain] = useState(tenant.customDomain || '');
   const [isActive, setIsActive] = useState(tenant.isActive);
   const [savingGeneral, setSavingGeneral] = useState(false);
 
@@ -154,7 +155,7 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: any; onClose: (
   const handleSaveGeneral = async () => {
     setSavingGeneral(true);
     try {
-      await updateTenant(tenant.id, { name, isActive });
+      await updateTenant(tenant.id, { name, customDomain: customDomain.trim() || undefined, isActive });
       toast.success('Tenant updated');
       onSaved();
     } catch { toast.error('Failed to update tenant'); }
@@ -203,6 +204,11 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: any; onClose: (
               <label className="label">Slug</label>
               <input value={tenant.slug} disabled className="input-field bg-charcoal-50 text-charcoal-400 cursor-not-allowed" />
               <p className="text-[10px] text-charcoal-400 mt-1">Slug changes aren't supported yet — it's used for tenant resolution.</p>
+            </div>
+            <div>
+              <label className="label">Custom Domain <span className="text-charcoal-400 normal-case tracking-normal font-normal">(optional)</span></label>
+              <input value={customDomain} onChange={e => setCustomDomain(e.target.value)} className="input-field" placeholder="concierge.fairmontbaku.com" />
+              <p className="text-[10px] text-charcoal-400 mt-1">Point this domain's DNS at Render, then add it as a Custom Domain on the frontend service there — this field only tells the backend which tenant it belongs to.</p>
             </div>
             <div className="flex items-center gap-3">
               <input type="checkbox" id="tenant-active" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="w-4 h-4 accent-gold-500" />

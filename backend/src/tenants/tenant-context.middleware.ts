@@ -20,8 +20,9 @@ export class TenantContextMiddleware implements NestMiddleware {
   async use(req: Request, _res: Response, next: NextFunction) {
     try {
       const headerSlug = (req.headers['x-tenant-slug'] as string) || undefined;
+      const tenantHost = (req.headers['x-tenant-host'] as string) || undefined;
       const host = req.headers.host;
-      const tenant = await this.tenantsService.resolveFromRequest(headerSlug, host);
+      const tenant = await this.tenantsService.resolveFromRequest(headerSlug, tenantHost, host);
       if (tenant) {
         req.tenant = { id: tenant.id, slug: tenant.slug, name: tenant.name };
       }

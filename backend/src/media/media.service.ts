@@ -1,18 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { join } from 'path';
-import { existsSync, unlinkSync } from 'fs';
+import { StorageService } from '../storage/storage.service';
+import { v4 as uuidv4 } from 'uuid';
+import { extname } from 'path';
 
 @Injectable()
 export class MediaService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private storage: StorageService) {}
 
-  private deleteFile(url: string) {
-    if (!url) return;
-    const uploadDir = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
-    const filename = url.replace('/uploads/', '');
-    const filePath = join(uploadDir, filename);
-    if (existsSync(filePath)) { try { unlinkSync(filePath); } catch (_) {} }
+  private keyFor(prefix: string, originalname: string): string {
+    const ext = extname(originalname).toLowerCase();
+    return `${prefix}/${uuidv4()}${ext}`;
   }
 
   async addImages(serviceId: string, files: Express.Multer.File[]) {
@@ -26,9 +24,13 @@ export class MediaService {
       ? existing.images[0].sortOrder + 1
       : 0;
 
-    const images = files.map((f, i) => ({
+    const uploaded = await Promise.all(
+      files.map((f) => this.storage.upload(f.buffer, this.keyFor('services', f.originalname), f.mimetype)),
+    );
+
+    const images = uploaded.map((url, i) => ({
       serviceId,
-      url: `/uploads/${f.filename}`,
+      url,
       alt: existing.name,
       sortOrder: nextSortOrder + i,
     }));
@@ -39,7 +41,7 @@ export class MediaService {
   async removeImage(imageId: string) {
     const image = await this.prisma.serviceImage.findUnique({ where: { id: imageId } });
     if (!image) throw new NotFoundException('Image not found');
-    this.deleteFile(image.url);
+    await this.storage.delete(image.url);
     return this.prisma.serviceImage.delete({ where: { id: imageId } });
   }
 
@@ -47,12 +49,11 @@ export class MediaService {
     const category = await this.prisma.category.findUnique({ where: { id: categoryId } });
     if (!category) throw new NotFoundException('Category not found');
 
-    // Delete old photo file if it was an upload
-    if (category.photo && category.photo.startsWith('/uploads/')) {
-      this.deleteFile(category.photo);
+    if (category.photo) {
+      await this.storage.delete(category.photo);
     }
 
-    const photoUrl = `/uploads/${file.filename}`;
+    const photoUrl = await this.storage.upload(file.buffer, this.keyFor('categories', file.originalname), file.mimetype);
     return this.prisma.category.update({
       where: { id: categoryId },
       data: { photo: photoUrl },
@@ -63,12 +64,11 @@ export class MediaService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    // Delete old profile photo if it was an upload
-    if (user.profilePhoto && user.profilePhoto.startsWith('/uploads/')) {
-      this.deleteFile(user.profilePhoto);
+    if (user.profilePhoto) {
+      await this.storage.delete(user.profilePhoto);
     }
 
-    const photoUrl = `/uploads/${file.filename}`;
+    const photoUrl = await this.storage.upload(file.buffer, this.keyFor('profiles', file.originalname), file.mimetype);
     return this.prisma.user.update({
       where: { id: userId },
       data: { profilePhoto: photoUrl },

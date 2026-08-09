@@ -11,28 +11,16 @@ import {
   Request,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import { memoryStorage } from 'multer';
 import { MediaService } from './media.service';
 import { JwtAuthGuard, RolesGuard, Roles } from '../auth/guards';
 
-function getUploadDir(): string {
-  const dir = process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-}
-
-const imageStorage = diskStorage({
-  destination: (_req, _file, cb) => cb(null, getUploadDir()),
-  filename: (_req, file, cb) => {
-    const ext = extname(file.originalname).toLowerCase();
-    cb(null, `${uuidv4()}${ext}`);
-  },
-});
+// Part 8: files now go through StorageService (local disk fallback, or
+// S3/R2 when configured) instead of being written straight to disk by
+// Multer — so Multer only needs to hold the upload in memory long enough
+// to hand the buffer off. See storage/storage.service.ts for why this
+// matters on Render specifically (local disk doesn't survive a redeploy).
+const imageStorage = memoryStorage();
 
 const imageFilter = (_req: any, file: Express.Multer.File, cb: any) => {
   if (!file.mimetype.match(/^image\/(jpeg|jpg|png|gif|webp)$/)) {
