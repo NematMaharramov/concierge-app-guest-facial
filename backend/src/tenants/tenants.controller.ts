@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Body, Param, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
-import { TenantsService, CreateTenantDto } from './tenants.service';
+import { TenantsService, CreateTenantDto, UpdateTenantDto, UpsertTenantBrandingDto, SetFeatureFlagDto } from './tenants.service';
 import { JwtAuthGuard, RolesGuard, Roles } from '../auth/guards';
 
 @Controller('tenants')
@@ -34,5 +34,40 @@ export class TenantsController {
   @Roles('SUPER_ADMIN')
   create(@Body() dto: CreateTenantDto) {
     return this.tenantsService.create(dto);
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  update(@Param('id') id: string, @Body() dto: UpdateTenantDto) {
+    return this.tenantsService.update(id, dto);
+  }
+
+  @Get(':id/branding')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  getBranding(@Param('id') id: string) {
+    return this.tenantsService.getBranding(id);
+  }
+
+  @Put(':id/branding')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  upsertBranding(@Param('id') id: string, @Body() dto: UpsertTenantBrandingDto) {
+    return this.tenantsService.upsertBranding(id, dto);
+  }
+
+  @Get(':id/feature-flags')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  getFeatureFlags(@Param('id') id: string) {
+    return this.tenantsService.getFeatureFlags(id);
+  }
+
+  @Put(':id/feature-flags')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  setFeatureFlag(@Param('id') id: string, @Body() dto: SetFeatureFlagDto) {
+    return this.tenantsService.setFeatureFlag(id, dto);
   }
 }

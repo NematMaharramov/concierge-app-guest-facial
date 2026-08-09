@@ -86,6 +86,20 @@ export const updateFilterOption = (id: string, data: { label?: string; sortOrder
   api.put(`/filter-options/${id}`, data).then(r => r.data);
 export const deleteFilterOption = (id: string) => api.delete(`/filter-options/${id}`).then(r => r.data);
 
+// ── Super Admin: Tenants (Part 7) ──────────────────────────────
+export const getTenants = () => api.get('/tenants').then(r => r.data);
+export const getTenant = (id: string) => api.get(`/tenants/${id}`).then(r => r.data);
+export const createTenant = (data: { name: string; slug: string; businessVertical?: string; adminEmail?: string; adminPassword?: string; adminName?: string }) =>
+  api.post('/tenants', data).then(r => r.data);
+export const updateTenant = (id: string, data: { name?: string; isActive?: boolean }) =>
+  api.put(`/tenants/${id}`, data).then(r => r.data);
+export const getTenantBranding = (id: string) => api.get(`/tenants/${id}/branding`).then(r => r.data);
+export const updateTenantBranding = (id: string, data: { logoUrl?: string; primaryColor?: string; accentColor?: string; siteTitle?: string; siteSubtitle?: string }) =>
+  api.put(`/tenants/${id}/branding`, data).then(r => r.data);
+export const getTenantFeatureFlags = (id: string) => api.get(`/tenants/${id}/feature-flags`).then(r => r.data);
+export const setTenantFeatureFlag = (id: string, key: string, enabled: boolean) =>
+  api.put(`/tenants/${id}/feature-flags`, { key, enabled }).then(r => r.data);
+
 // ── Admin: Users ─────────────────────────────────────────────
 export const getUsers = () => api.get('/users').then(r => r.data);
 export const createUser = (data: any) => api.post('/users', data).then(r => r.data);

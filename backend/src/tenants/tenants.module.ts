@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { TenantsService } from './tenants.service';
 import { TenantsController } from './tenants.controller';
 import { CategoryTemplatesModule } from '../category-templates/category-templates.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
-  imports: [CategoryTemplatesModule],
+  imports: [CategoryTemplatesModule, UsersModule],
   providers: [TenantsService],
   controllers: [TenantsController],
   exports: [TenantsService],
