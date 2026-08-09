@@ -7,6 +7,7 @@ import {
 } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { ExcelImportWizard } from '@/components/ExcelImportWizard';
 
 const VERTICALS = [
   { value: '', label: 'None (build categories by hand)' },
@@ -109,9 +110,8 @@ function CreateTenantWizard({ onClose, onCreated }: { onClose: () => void; onCre
             </div>
 
             <div className="p-4 bg-charcoal-50 border border-charcoal-100 text-xs text-charcoal-500 leading-relaxed">
-              <span className="font-medium text-charcoal-700">Excel data import</span> isn't available yet in this build —
-              the brand's price sheets can be added by hand from their Services panel for now, or by your team directly.
-              A dedicated import tool is planned.
+              <span className="font-medium text-charcoal-700">Excel data import</span> is available
+              right after creating this tenant — look for "Import Data" next to it in the Tenants list.
             </div>
 
             <div className="flex gap-3 pt-2">
@@ -288,6 +288,7 @@ export default function SuperAdminTenantsPage() {
   const [loading, setLoading] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+  const [importingFor, setImportingFor] = useState<any>(null);
 
   const load = () => getTenants().then(setTenants).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
@@ -331,6 +332,8 @@ export default function SuperAdminTenantsPage() {
                     <td className="px-5 py-4 text-charcoal-500 text-xs">{format(new Date(t.createdAt), 'dd MMM yyyy')}</td>
                     <td className="px-5 py-4">
                       <button onClick={() => setEditing(t)} className="text-gold-500 hover:text-gold-600 text-xs tracking-widest uppercase">Manage</button>
+                      {' '}
+                      <button onClick={() => setImportingFor(t)} className="text-charcoal-400 hover:text-charcoal-900 text-xs tracking-widest uppercase ml-3">Import Data</button>
                     </td>
                   </tr>
                 ))}
@@ -342,6 +345,7 @@ export default function SuperAdminTenantsPage() {
 
       {showWizard && <CreateTenantWizard onClose={() => setShowWizard(false)} onCreated={load} />}
       {editing && <EditTenantModal tenant={editing} onClose={() => setEditing(null)} onSaved={load} />}
+      {importingFor && <ExcelImportWizard tenantId={importingFor.id} onClose={() => setImportingFor(null)} />}
     </div>
   );
 }

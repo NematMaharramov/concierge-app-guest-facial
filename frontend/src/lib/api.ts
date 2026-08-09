@@ -126,3 +126,23 @@ export const getStats = () => api.get('/reservations/stats').then(r => r.data);
 // ── Audit ────────────────────────────────────────────────────
 export const getAuditLogs = (reservationId?: string) =>
   api.get('/audit', { params: reservationId ? { reservationId } : {} }).then(r => r.data);
+
+// ── Excel Import (Part 6) ──────────────────────────────────────
+export const getImportableFields = () => api.get('/import/fields').then(r => r.data);
+export const getImportCategories = (tenantId?: string) =>
+  api.get('/import/categories', { params: tenantId ? { tenantId } : {} }).then(r => r.data);
+export const previewImportFile = (file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  return api.post('/import/preview', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+};
+export const commitImport = (params: {
+  file: File; categoryId: string; mapping: Record<number, string>; mode: 'replace' | 'append';
+}) => {
+  const form = new FormData();
+  form.append('file', params.file);
+  form.append('categoryId', params.categoryId);
+  form.append('mapping', JSON.stringify(params.mapping));
+  form.append('mode', params.mode);
+  return api.post('/import/commit', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+};
