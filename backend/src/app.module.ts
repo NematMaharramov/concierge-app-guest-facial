@@ -11,11 +11,15 @@ import { PrismaModule } from './prisma/prisma.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { CategoryTemplatesModule } from './category-templates/category-templates.module';
 import { FilterGroupsModule } from './filter-groups/filter-groups.module';
+import { StorageModule } from './storage/storage.module';
+import { CommonModule } from './common/common.module';
 import { TenantContextMiddleware } from './tenants/tenant-context.middleware';
 
 @Module({
   imports: [
     PrismaModule,
+    CommonModule,
+    StorageModule,
     TenantsModule,
     CategoryTemplatesModule,
     FilterGroupsModule,

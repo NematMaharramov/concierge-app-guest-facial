@@ -24,6 +24,7 @@ export class CreateTenantDto {
 
 export class UpdateTenantDto {
   @IsString() @IsOptional() name?: string;
+  @IsString() @IsOptional() customDomain?: string;
   @IsOptional() isActive?: boolean;
 }
 
@@ -104,6 +105,12 @@ export class TenantsService {
 
   async update(id: string, dto: UpdateTenantDto) {
     await this.findById(id);
+    if (dto.customDomain) {
+      const existing = await this.findByCustomDomain(dto.customDomain);
+      if (existing && existing.id !== id) {
+        throw new ConflictException(`Domain "${dto.customDomain}" is already in use by another tenant`);
+      }
+    }
     return this.prisma.tenant.update({ where: { id }, data: dto, include: { branding: true } });
   }
 
@@ -146,22 +153,63 @@ export class TenantsService {
    *  3. DEFAULT_TENANT_SLUG, so the app keeps working exactly as before on
    *     the current single Render domain.
    */
-  async resolveFromRequest(headerSlug: string | undefined, host: string | undefined) {
+  findByCustomDomain(customDomain: string) {
+    return this.prisma.tenant.findUnique({ where: { customDomain }, include: { branding: true } });
+  }
+
+  /**
+   * Tries to resolve a tenant from a single hostname string: first as an
+   * exact custom-domain match (e.g. "concierge.fairmontbaku.com"), then as
+   * a subdomain of the platform's own domain (e.g. "hilton.ourapp.com" ->
+   * slug "hilton"). Bare domains / localhost / IPs are skipped for the
+   * subdomain check since they have no meaningful subdomain segment.
+   */
+  private async resolveHostname(hostname: string) {
+    const bare = hostname.split(':')[0];
+
+    const byCustomDomain = await this.findByCustomDomain(bare);
+    if (byCustomDomain) return byCustomDomain;
+
+    const parts = bare.split('.');
+    if (parts.length > 2) {
+      const bySubdomain = await this.findBySlug(parts[0]);
+      if (bySubdomain) return bySubdomain;
+    }
+
+    return null;
+  }
+
+  /**
+   * Resolves a tenant for an incoming request using, in order:
+   *  1. an explicit `x-tenant-slug` header — exact slug, used by the staff
+   *     dashboard and for testing/tooling.
+   *  2. `x-tenant-host` — the *browser's* hostname, sent explicitly by the
+   *     frontend (see frontend/src/lib/api.ts). This exists because the
+   *     backend and frontend are typically deployed as separate Render
+   *     services with their own domains: the Host header the backend
+   *     itself receives is its own domain, not the one the guest actually
+   *     visited, so subdomain/custom-domain routing can't rely on
+   *     req.headers.host alone in that topology.
+   *  3. `req.headers.host` — still checked as a fallback, for setups where
+   *     the backend genuinely does sit behind the tenant's own domain
+   *     (e.g. a reverse proxy that preserves the original Host header).
+   *  4. DEFAULT_TENANT_SLUG, so the app keeps working exactly as before
+   *     wherever no tenant domain has been configured yet.
+   */
+  async resolveFromRequest(headerSlug: string | undefined, tenantHost: string | undefined, host: string | undefined) {
     if (headerSlug) {
       const bySlug = await this.findBySlug(headerSlug);
       if (bySlug) return bySlug;
     }
 
+    if (tenantHost) {
+      const resolved = await this.resolveHostname(tenantHost);
+      if (resolved) return resolved;
+    }
+
     if (host) {
-      const hostname = host.split(':')[0];
-      const parts = hostname.split('.');
-      // Only treat it as a subdomain if there's actually a subdomain segment
-      // (skip bare domains / localhost / IP addresses).
-      if (parts.length > 2) {
-        const subdomain = parts[0];
-        const bySubdomain = await this.findBySlug(subdomain);
-        if (bySubdomain) return bySubdomain;
-      }
+      const resolved = await this.resolveHostname(host);
+      if (resolved) return resolved;
     }
 
     return this.findBySlug(DEFAULT_TENANT_SLUG);

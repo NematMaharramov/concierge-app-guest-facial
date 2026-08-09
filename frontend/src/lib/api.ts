@@ -8,6 +8,12 @@ api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
+    // Part 8: tell the backend which hostname the guest/staff actually
+    // visited. The frontend and backend are typically separate Render
+    // services with their own domains, so the backend's own req.headers.host
+    // can't be used to detect a tenant's subdomain/custom domain — this
+    // header carries the browser's real hostname instead.
+    config.headers['x-tenant-host'] = window.location.hostname;
   }
   return config;
 });
@@ -91,7 +97,7 @@ export const getTenants = () => api.get('/tenants').then(r => r.data);
 export const getTenant = (id: string) => api.get(`/tenants/${id}`).then(r => r.data);
 export const createTenant = (data: { name: string; slug: string; businessVertical?: string; adminEmail?: string; adminPassword?: string; adminName?: string }) =>
   api.post('/tenants', data).then(r => r.data);
-export const updateTenant = (id: string, data: { name?: string; isActive?: boolean }) =>
+export const updateTenant = (id: string, data: { name?: string; customDomain?: string; isActive?: boolean }) =>
   api.put(`/tenants/${id}`, data).then(r => r.data);
 export const getTenantBranding = (id: string) => api.get(`/tenants/${id}/branding`).then(r => r.data);
 export const updateTenantBranding = (id: string, data: { logoUrl?: string; primaryColor?: string; accentColor?: string; siteTitle?: string; siteSubtitle?: string }) =>
