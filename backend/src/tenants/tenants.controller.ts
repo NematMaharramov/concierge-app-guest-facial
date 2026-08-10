@@ -9,10 +9,17 @@ export class TenantsController {
 
   // Lets the frontend discover which tenant the current host/header
   // resolves to (branding, name) without requiring auth — needed for the
-  // public guest site to theme itself before login.
+  // public guest site to theme itself before login, and (Part 4) to check
+  // feature flags like 'monthly_events' to decide whether to render an
+  // optional guest-site section at all.
   @Get('current')
-  current(@Req() req: Request) {
-    return req.tenant || null;
+  async current(@Req() req: Request) {
+    if (!req.tenant) return null;
+    const flags = await this.tenantsService.getFeatureFlags(req.tenant.id);
+    return {
+      ...req.tenant,
+      featureFlags: Object.fromEntries(flags.map((f) => [f.key, f.enabled])),
+    };
   }
 
   @Get()
