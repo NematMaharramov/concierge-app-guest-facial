@@ -12,6 +12,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { CategoryTemplatesModule } from './category-templates/category-templates.module';
 import { FilterGroupsModule } from './filter-groups/filter-groups.module';
 import { ImportModule } from './import/import.module';
+import { EventsModule } from './events/events.module';
 import { StorageModule } from './storage/storage.module';
 import { CommonModule } from './common/common.module';
 import { TenantContextMiddleware } from './tenants/tenant-context.middleware';
@@ -25,6 +26,7 @@ import { TenantContextMiddleware } from './tenants/tenant-context.middleware';
     CategoryTemplatesModule,
     FilterGroupsModule,
     ImportModule,
+    EventsModule,
     AuthModule,
     UsersModule,
     CategoriesModule,

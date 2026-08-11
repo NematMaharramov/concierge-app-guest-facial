@@ -13,6 +13,7 @@ const navItems = [
   { href: '/dashboard/reservations', label: 'Reservations', icon: '📋' },
   { href: '/dashboard/admin/services', label: 'Services', icon: '🏝️', adminOnly: true },
   { href: '/dashboard/admin/categories', label: 'Categories', icon: '📁', adminOnly: true },
+  { href: '/dashboard/admin/events', label: 'Events', icon: '🎉', adminOnly: true },
   { href: '/dashboard/admin/users', label: 'Users', icon: '👥', adminOnly: true },
   { href: '/dashboard/admin/import', label: 'Import from Excel', icon: '📥', adminOnly: true },
   { href: '/dashboard/admin/settings', label: 'Settings', icon: '⚙️', adminOnly: true },

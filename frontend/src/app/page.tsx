@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { getCategories, getSettings } from '@/lib/api';
+import { getCategories, getSettings, getCurrentTenant, getEvents } from '@/lib/api';
 import Link from 'next/link';
+import { format, isValid } from 'date-fns';
 
 // ── Per-category image sets (3 images each, no broken URLs) ─────────────────
 const CATEGORY_IMAGES: Record<string, string[]> = {
@@ -93,6 +94,10 @@ export default function HomePage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  // Part 4: optional monthly events section — only rendered if the tenant
+  // has the 'monthly_events' feature flag on AND actually has events.
+  const [events, setEvents] = useState<any[]>([]);
+  const [eventsEnabled, setEventsEnabled] = useState(false);
 
   // ── Header scroll state ──────────────────────────────────────────────────
   // headerVisible drives the CSS transform. We keep lastScrollY in a ref
@@ -105,6 +110,13 @@ export default function HomePage() {
     Promise.all([getCategories(), getSettings()])
       .then(([cats, sets]) => { setCategories(cats); setSettings(sets); })
       .finally(() => setLoading(false));
+
+    getCurrentTenant().then(tenant => {
+      if (tenant?.featureFlags?.monthly_events) {
+        setEventsEnabled(true);
+        getEvents(true).then(setEvents).catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
 
   // Apply settings-driven CSS variables for theming
@@ -373,6 +385,42 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {/* ── Monthly events (Part 4, optional) ────────────────────────────── */}
+      {eventsEnabled && events.length > 0 && (
+        <section className="py-24 px-6 bg-white">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-14">
+              <p className="text-[10px] tracking-[0.55em] uppercase mb-4 font-medium" style={{ color: accent }}>
+                What's On
+              </p>
+              <h2 className="font-display font-light" style={{ fontSize: '2.1rem', color: primary, letterSpacing: '0.04em' }}>
+                This Month at {settings.site_title || 'Our Hotel'}
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {events.slice(0, 6).map((e: any) => {
+                const start = new Date(e.startDate);
+                return (
+                  <div key={e.id} className="flex gap-5 border border-charcoal-100 p-5">
+                    <div className="text-center flex-shrink-0 w-14">
+                      <p className="font-display text-2xl font-light" style={{ color: primary }}>{isValid(start) ? format(start, 'd') : '—'}</p>
+                      <p className="text-[10px] tracking-widest uppercase text-charcoal-400">{isValid(start) ? format(start, 'MMM') : ''}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-charcoal-900 font-medium mb-1 truncate">{e.title}</h3>
+                      {e.description && <p className="text-charcoal-500 text-xs leading-relaxed line-clamp-2 mb-1.5">{e.description}</p>}
+                      <p className="text-[11px] text-charcoal-400">
+                        {[e.location, e.category].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Concierge strip ───────────────────────────────────────────────── */}
       {/*

@@ -146,3 +146,13 @@ export const commitImport = (params: {
   form.append('mode', params.mode);
   return api.post('/import/commit', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
 };
+
+// ── Current tenant (public, host-resolved) ─────────────────────
+export const getCurrentTenant = () => api.get('/tenants/current').then(r => r.data);
+
+// ── Monthly Events (Part 4) ────────────────────────────────────
+export const getEvents = (upcoming = false) => api.get('/events', { params: upcoming ? { upcoming: 'true' } : {} }).then(r => r.data);
+export const getAllEvents = () => api.get('/events/admin').then(r => r.data);
+export const createEvent = (data: any) => api.post('/events', data).then(r => r.data);
+export const updateEvent = (id: string, data: any) => api.put(`/events/${id}`, data).then(r => r.data);
+export const deleteEvent = (id: string) => api.delete(`/events/${id}`).then(r => r.data);
