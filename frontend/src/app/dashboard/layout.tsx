@@ -4,7 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useInactivityLogout } from '@/lib/useInactivityLogout';
-import { getUserTheme, setUserTheme } from '@/lib/api';
+import { getUserTheme, setUserTheme, getCurrentTenant } from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -17,6 +17,9 @@ const navItems = [
   { href: '/dashboard/admin/events', label: 'Events', icon: '🎉', adminOnly: true },
   { href: '/dashboard/admin/letter-templates', label: 'Letter Templates', icon: '📝', adminOnly: true },
   { href: '/dashboard/admin/room-types', label: 'Room Types', icon: '🛏️', adminOnly: true },
+  { href: '/dashboard/taxi-directory', label: 'Taxi Drivers', icon: '🚕', featureFlag: 'taxi_directory' },
+  { href: '/dashboard/phone-directory', label: 'Phone Directory', icon: '☎️', featureFlag: 'phone_directory' },
+  { href: '/dashboard/price-sheets', label: 'Price Sheets', icon: '💶', featureFlag: 'price_sheets' },
   { href: '/dashboard/admin/users', label: 'Users', icon: '👥', adminOnly: true },
   { href: '/dashboard/admin/import', label: 'Import from Excel', icon: '📥', adminOnly: true },
   { href: '/dashboard/admin/settings', label: 'Settings', icon: '⚙️', adminOnly: true },
@@ -71,6 +74,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Theme defaults to 'dark'; loads from DB once user is available
   const [theme, setTheme] = useState<SidebarTheme>('dark');
   const [themeLoaded, setThemeLoaded] = useState(false);
+  // Part 9: staff utility nav items are gated per-tenant by feature flag
+  // (a business hotel might not want an irrelevant "Taxi Drivers" item).
+  const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({});
 
   // Load theme from DB when user is ready
   useEffect(() => {
@@ -81,6 +87,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       })
       .catch(() => {/* keep default */})
       .finally(() => setThemeLoaded(true));
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || user.role === 'SUPER_ADMIN') return;
+    getCurrentTenant()
+      .then(t => setFeatureFlags(t?.featureFlags || {}))
+      .catch(() => {/* leave utility nav items hidden on failure */});
   }, [user?.id]);
 
   const toggleTheme = async () => {
@@ -119,6 +132,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // panel" scope separation.
     if (item.superAdminOnly) return user.role === 'SUPER_ADMIN';
     if (user.role === 'SUPER_ADMIN') return item.href === '/dashboard';
+    if (item.featureFlag) return !!featureFlags[item.featureFlag];
     if (item.adminOnly) return user.role === 'ADMIN';
     return true;
   });
