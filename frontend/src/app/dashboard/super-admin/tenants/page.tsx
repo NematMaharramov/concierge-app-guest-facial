@@ -4,6 +4,7 @@ import {
   getTenants, createTenant, updateTenant,
   getTenantBranding, updateTenantBranding,
   getTenantFeatureFlags, setTenantFeatureFlag,
+  getOutlookStatus, updateOutlookConfig,
 } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -129,7 +130,7 @@ function CreateTenantWizard({ onClose, onCreated }: { onClose: () => void; onCre
 
 // ── Edit modal: General / Branding / Feature Flags ───────────────────────────
 function EditTenantModal({ tenant, onClose, onSaved }: { tenant: any; onClose: () => void; onSaved: () => void }) {
-  const [tab, setTab] = useState<'general' | 'branding' | 'flags'>('general');
+  const [tab, setTab] = useState<'general' | 'branding' | 'flags' | 'outlook'>('general');
 
   const [name, setName] = useState(tenant.name);
   const [customDomain, setCustomDomain] = useState(tenant.customDomain || '');
@@ -143,6 +144,11 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: any; onClose: (
   const [flags, setFlags] = useState<any[]>([]);
   const [flagsLoaded, setFlagsLoaded] = useState(false);
 
+  const [outlook, setOutlook] = useState<any>({});
+  const [outlookLoaded, setOutlookLoaded] = useState(false);
+  const [savingOutlook, setSavingOutlook] = useState(false);
+  const [outlookForm, setOutlookForm] = useState({ azureTenantId: '', clientId: '', clientSecret: '', senderEmail: '' });
+
   useEffect(() => {
     if (tab === 'branding' && !brandingLoaded) {
       getTenantBranding(tenant.id).then(b => setBranding(b || {})).finally(() => setBrandingLoaded(true));
@@ -150,7 +156,24 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: any; onClose: (
     if (tab === 'flags' && !flagsLoaded) {
       getTenantFeatureFlags(tenant.id).then(setFlags).finally(() => setFlagsLoaded(true));
     }
+    if (tab === 'outlook' && !outlookLoaded) {
+      getOutlookStatus(tenant.id).then(setOutlook).finally(() => setOutlookLoaded(true));
+    }
   }, [tab]);
+
+  const handleSaveOutlook = async () => {
+    setSavingOutlook(true);
+    try {
+      const status = await updateOutlookConfig(tenant.id, outlookForm);
+      setOutlook(status);
+      setOutlookForm({ azureTenantId: '', clientId: '', clientSecret: '', senderEmail: '' });
+      toast.success('Outlook configuration saved');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to save Outlook configuration');
+    } finally {
+      setSavingOutlook(false);
+    }
+  };
 
   const handleSaveGeneral = async () => {
     setSavingGeneral(true);
@@ -186,10 +209,10 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: any; onClose: (
         </div>
 
         <div className="px-6 pt-4 flex gap-4 border-b border-charcoal-100">
-          {(['general', 'branding', 'flags'] as const).map(t => (
+          {(['general', 'branding', 'flags', 'outlook'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`pb-3 text-xs tracking-widest uppercase transition-colors border-b-2 ${tab === t ? 'text-gold-600 border-gold-500 font-medium' : 'text-charcoal-400 border-transparent hover:text-charcoal-700'}`}>
-              {t === 'general' ? 'General' : t === 'branding' ? 'Branding' : 'Feature Flags'}
+              {t === 'general' ? 'General' : t === 'branding' ? 'Branding' : t === 'flags' ? 'Feature Flags' : 'Outlook'}
             </button>
           ))}
         </div>
@@ -254,6 +277,16 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: any; onClose: (
                     </div>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Latitude <span className="text-charcoal-400 normal-case tracking-normal font-normal">(for weather in pre-arrival letters)</span></label>
+                    <input type="number" step="any" value={branding.latitude ?? ''} onChange={e => setBranding((b: any) => ({ ...b, latitude: e.target.value === '' ? undefined : Number(e.target.value) }))} className="input-field" placeholder="40.4093" />
+                  </div>
+                  <div>
+                    <label className="label">Longitude</label>
+                    <input type="number" step="any" value={branding.longitude ?? ''} onChange={e => setBranding((b: any) => ({ ...b, longitude: e.target.value === '' ? undefined : Number(e.target.value) }))} className="input-field" placeholder="49.8671" />
+                  </div>
+                </div>
                 <button onClick={handleSaveBranding} disabled={savingBranding} className="btn-primary w-full">
                   {savingBranding ? 'Saving…' : 'Save Branding'}
                 </button>
@@ -275,6 +308,45 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: any; onClose: (
               ))
             )}
             <p className="text-[10px] text-charcoal-400 pt-3">Modules aren't wired up to these flags yet — this panel just records the intended configuration ahead of each module shipping.</p>
+          </div>
+        )}
+
+        {tab === 'outlook' && (
+          <div className="p-6 space-y-4">
+            {!outlookLoaded ? (
+              <p className="text-xs text-charcoal-400">Loading…</p>
+            ) : (
+              <>
+                <div className={`p-3 text-xs border ${outlook.configured && outlook.isActive ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-charcoal-50 border-charcoal-100 text-charcoal-500'}`}>
+                  {outlook.configured
+                    ? `Configured — sending from ${outlook.senderEmail}${outlook.isActive ? '' : ' (inactive)'}`
+                    : 'Not configured yet — pre-arrival letters for this tenant will fail to send until this is set up, or a platform-wide OUTLOOK_* env var fallback is set on Render.'}
+                </div>
+                <p className="text-xs text-charcoal-500 leading-relaxed">
+                  Requires an Azure AD App Registration with <code>Mail.Send</code> application
+                  permission (admin-consented) — done once in the Azure Portal, outside this app.
+                </p>
+                <div>
+                  <label className="label">Azure Tenant ID</label>
+                  <input value={outlookForm.azureTenantId} onChange={e => setOutlookForm(f => ({ ...f, azureTenantId: e.target.value }))} className="input-field" placeholder="00000000-0000-0000-0000-000000000000" />
+                </div>
+                <div>
+                  <label className="label">App (Client) ID</label>
+                  <input value={outlookForm.clientId} onChange={e => setOutlookForm(f => ({ ...f, clientId: e.target.value }))} className="input-field" />
+                </div>
+                <div>
+                  <label className="label">Client Secret</label>
+                  <input type="password" value={outlookForm.clientSecret} onChange={e => setOutlookForm(f => ({ ...f, clientSecret: e.target.value }))} className="input-field" placeholder={outlook.configured ? '••••••••  (leave blank to keep current)' : ''} />
+                </div>
+                <div>
+                  <label className="label">Sender Mailbox</label>
+                  <input value={outlookForm.senderEmail} onChange={e => setOutlookForm(f => ({ ...f, senderEmail: e.target.value }))} className="input-field" placeholder="concierge@hotel.com" />
+                </div>
+                <button onClick={handleSaveOutlook} disabled={savingOutlook} className="btn-primary w-full">
+                  {savingOutlook ? 'Saving…' : 'Save Outlook Configuration'}
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

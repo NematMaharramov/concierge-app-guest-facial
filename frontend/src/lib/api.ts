@@ -100,7 +100,7 @@ export const createTenant = (data: { name: string; slug: string; businessVertica
 export const updateTenant = (id: string, data: { name?: string; customDomain?: string; isActive?: boolean }) =>
   api.put(`/tenants/${id}`, data).then(r => r.data);
 export const getTenantBranding = (id: string) => api.get(`/tenants/${id}/branding`).then(r => r.data);
-export const updateTenantBranding = (id: string, data: { logoUrl?: string; primaryColor?: string; accentColor?: string; siteTitle?: string; siteSubtitle?: string }) =>
+export const updateTenantBranding = (id: string, data: { logoUrl?: string; primaryColor?: string; accentColor?: string; siteTitle?: string; siteSubtitle?: string; latitude?: number; longitude?: number }) =>
   api.put(`/tenants/${id}/branding`, data).then(r => r.data);
 export const getTenantFeatureFlags = (id: string) => api.get(`/tenants/${id}/feature-flags`).then(r => r.data);
 export const setTenantFeatureFlag = (id: string, key: string, enabled: boolean) =>
@@ -156,3 +156,28 @@ export const getAllEvents = () => api.get('/events/admin').then(r => r.data);
 export const createEvent = (data: any) => api.post('/events', data).then(r => r.data);
 export const updateEvent = (id: string, data: any) => api.put(`/events/${id}`, data).then(r => r.data);
 export const deleteEvent = (id: string) => api.delete(`/events/${id}`).then(r => r.data);
+
+// ── Letter Templates (Part 5) ──────────────────────────────────
+export const getMergeFields = () => api.get('/letter-templates/merge-fields').then(r => r.data);
+export const getLetterTemplates = () => api.get('/letter-templates').then(r => r.data);
+export const createLetterTemplate = (data: any) => api.post('/letter-templates', data).then(r => r.data);
+export const updateLetterTemplate = (id: string, data: any) => api.put(`/letter-templates/${id}`, data).then(r => r.data);
+export const deleteLetterTemplate = (id: string) => api.delete(`/letter-templates/${id}`).then(r => r.data);
+
+// ── Room Types (Part 5) ─────────────────────────────────────────
+export const getRoomTypes = () => api.get('/room-types').then(r => r.data);
+export const createRoomType = (data: any) => api.post('/room-types', data).then(r => r.data);
+export const updateRoomType = (id: string, data: any) => api.put(`/room-types/${id}`, data).then(r => r.data);
+export const deleteRoomType = (id: string) => api.delete(`/room-types/${id}`).then(r => r.data);
+
+// ── Guest Communications / Pre-Arrival Letters (Part 5) ─────────
+export const getSendContext = () => api.get('/guest-communications/send-context').then(r => r.data);
+export const getSuggestedEvents = (arrivalDate: string, departureDate?: string) =>
+  api.get('/guest-communications/suggested-events', { params: { arrivalDate, departureDate } }).then(r => r.data);
+export const previewLetter = (data: any) => api.post('/guest-communications/preview', data).then(r => r.data);
+export const sendLetter = (data: any) => api.post('/guest-communications/send', data).then(r => r.data);
+export const getLetterHistory = () => api.get('/guest-communications/history').then(r => r.data);
+
+// ── Integrations (Part 5, Super Admin only) ──────────────────────
+export const getOutlookStatus = (tenantId: string) => api.get(`/integrations/${tenantId}/outlook`).then(r => r.data);
+export const updateOutlookConfig = (tenantId: string, data: any) => api.put(`/integrations/${tenantId}/outlook`, data).then(r => r.data);

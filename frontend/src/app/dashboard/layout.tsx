@@ -11,9 +11,12 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊', exact: true },
   { href: '/dashboard/reservations', label: 'Reservations', icon: '📋' },
+  { href: '/dashboard/pre-arrival', label: 'Pre-Arrival Letters', icon: '✉️' },
   { href: '/dashboard/admin/services', label: 'Services', icon: '🏝️', adminOnly: true },
   { href: '/dashboard/admin/categories', label: 'Categories', icon: '📁', adminOnly: true },
   { href: '/dashboard/admin/events', label: 'Events', icon: '🎉', adminOnly: true },
+  { href: '/dashboard/admin/letter-templates', label: 'Letter Templates', icon: '📝', adminOnly: true },
+  { href: '/dashboard/admin/room-types', label: 'Room Types', icon: '🛏️', adminOnly: true },
   { href: '/dashboard/admin/users', label: 'Users', icon: '👥', adminOnly: true },
   { href: '/dashboard/admin/import', label: 'Import from Excel', icon: '📥', adminOnly: true },
   { href: '/dashboard/admin/settings', label: 'Settings', icon: '⚙️', adminOnly: true },

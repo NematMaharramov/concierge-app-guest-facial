@@ -13,6 +13,10 @@ import { CategoryTemplatesModule } from './category-templates/category-templates
 import { FilterGroupsModule } from './filter-groups/filter-groups.module';
 import { ImportModule } from './import/import.module';
 import { EventsModule } from './events/events.module';
+import { LetterTemplatesModule } from './letter-templates/letter-templates.module';
+import { RoomTypesModule } from './room-types/room-types.module';
+import { IntegrationsModule } from './integrations/integrations.module';
+import { GuestCommunicationsModule } from './guest-communications/guest-communications.module';
 import { StorageModule } from './storage/storage.module';
 import { CommonModule } from './common/common.module';
 import { TenantContextMiddleware } from './tenants/tenant-context.middleware';
@@ -27,6 +31,10 @@ import { TenantContextMiddleware } from './tenants/tenant-context.middleware';
     FilterGroupsModule,
     ImportModule,
     EventsModule,
+    LetterTemplatesModule,
+    RoomTypesModule,
+    IntegrationsModule,
+    GuestCommunicationsModule,
     AuthModule,
     UsersModule,
     CategoriesModule,

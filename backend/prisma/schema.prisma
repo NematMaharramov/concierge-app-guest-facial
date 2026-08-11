@@ -89,6 +89,10 @@ model Tenant {
   reservations Reservation[]
   auditLogs    AuditLog[]
   events       Event[]
+  letterTemplates     LetterTemplate[]
+  roomTypes           RoomTypeInfo[]
+  guestCommunications GuestCommunication[]
+  integrations        TenantIntegration[]
 }
 
 model TenantBranding {
@@ -99,6 +103,10 @@ model TenantBranding {
   accentColor  String?
   siteTitle    String?
   siteSubtitle String?
+  // Part 5: hotel coordinates, used to fetch the arrival-day weather
+  // forecast for a pre-arrival letter's {{weather_forecast}} field.
+  latitude     Float?
+  longitude    Float?
   updatedAt    DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -136,6 +144,7 @@ model User {
   tenant       Tenant?       @relation(fields: [tenantId], references: [id])
   reservations Reservation[]
   auditLogs    AuditLog[]
+  guestCommunicationsSent GuestCommunication[]
 
   @@index([tenantId])
 }
@@ -317,4 +326,81 @@ model SiteSettings {
   key             String   @unique
   value           String
   updatedAt       DateTime @updatedAt
+}
+
+// ─── Pre-Arrival Letter system (Part 5) ─────────────────────────
+
+model LetterTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String              // "Standard Pre-Arrival"
+  subject   String              // merge-field aware: "Welcome to {{hotel_name}}, {{guest_first_name}}!"
+  bodyHtml  String              // rich-text HTML with {{merge_field}} placeholders
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  communications GuestCommunication[]
+
+  @@index([tenantId])
+}
+
+// Room-type -> inclusions text, maintained by hand. Needed even when a
+// tenant has no PMS connection at all (the always-available fallback path
+// the spec explicitly requires), and used to resolve the PMS room code to
+// readable inclusions text when a PMS *is* connected.
+model RoomTypeInfo {
+  id             String   @id @default(uuid())
+  tenantId       String
+  roomTypeName   String
+  inclusionsText String?
+  pmsRoomCode    String?  // optional: the code Opera sends, if known
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, roomTypeName])
+  @@index([tenantId])
+}
+
+// One row per sent (or failed) pre-arrival letter. finalHtml is a frozen
+// copy — editing the LetterTemplate later must never change what a
+// previously-sent letter is shown as having said (spec's audit requirement).
+model GuestCommunication {
+  id               String   @id @default(uuid())
+  tenantId         String
+  guestName        String
+  guestEmail       String
+  pmsReservationId String?
+  templateId       String
+  finalHtml        String
+  eventIds         Json?
+  weatherSnapshot  Json?
+  sentByUserId     String
+  sentAt           DateTime @default(now())
+  status           String   @default("SENT") // SENT / FAILED
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  template LetterTemplate @relation(fields: [templateId], references: [id])
+  sentBy   User           @relation(fields: [sentByUserId], references: [id])
+
+  @@index([tenantId])
+}
+
+// Generic per-tenant credential storage for external integrations
+// (Outlook, and eventually Opera PMS). Secrets are encrypted at rest via
+// CryptoService (Part 8) — never stored as plaintext.
+model TenantIntegration {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  provider           String   // "outlook" | "opera"
+  encryptedCredentials String? // JSON blob, encrypted (client secret, tokens, etc.)
+  config             Json?    // non-secret config (e.g. sender mailbox address)
+  isActive           Boolean  @default(false)
+  updatedAt          DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
 }
