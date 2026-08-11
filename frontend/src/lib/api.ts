@@ -181,3 +181,19 @@ export const getLetterHistory = () => api.get('/guest-communications/history').t
 // ── Integrations (Part 5, Super Admin only) ──────────────────────
 export const getOutlookStatus = (tenantId: string) => api.get(`/integrations/${tenantId}/outlook`).then(r => r.data);
 export const updateOutlookConfig = (tenantId: string, data: any) => api.put(`/integrations/${tenantId}/outlook`, data).then(r => r.data);
+
+// ── Staff Utility Modules (Part 9) ───────────────────────────────
+export const getTaxiDrivers = () => api.get('/taxi-drivers').then(r => r.data);
+export const createTaxiDriver = (data: any) => api.post('/taxi-drivers', data).then(r => r.data);
+export const updateTaxiDriver = (id: string, data: any) => api.put(`/taxi-drivers/${id}`, data).then(r => r.data);
+export const deleteTaxiDriver = (id: string) => api.delete(`/taxi-drivers/${id}`).then(r => r.data);
+
+export const getPhoneDirectory = () => api.get('/phone-directory').then(r => r.data);
+export const createPhoneEntry = (data: any) => api.post('/phone-directory', data).then(r => r.data);
+export const updatePhoneEntry = (id: string, data: any) => api.put(`/phone-directory/${id}`, data).then(r => r.data);
+export const deletePhoneEntry = (id: string) => api.delete(`/phone-directory/${id}`).then(r => r.data);
+
+export const getPriceSheetItems = () => api.get('/price-sheets').then(r => r.data);
+export const createPriceSheetItem = (data: any) => api.post('/price-sheets', data).then(r => r.data);
+export const updatePriceSheetItem = (id: string, data: any) => api.put(`/price-sheets/${id}`, data).then(r => r.data);
+export const deletePriceSheetItem = (id: string) => api.delete(`/price-sheets/${id}`).then(r => r.data);

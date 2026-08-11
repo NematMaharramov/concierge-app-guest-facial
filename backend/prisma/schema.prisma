@@ -93,6 +93,9 @@ model Tenant {
   roomTypes           RoomTypeInfo[]
   guestCommunications GuestCommunication[]
   integrations        TenantIntegration[]
+  taxiDrivers         TaxiDriver[]
+  phoneDirectory      PhoneDirectoryEntry[]
+  priceSheetItems     PriceSheetItem[]
 }
 
 model TenantBranding {
@@ -402,5 +405,61 @@ model TenantIntegration {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, provider])
+  @@index([tenantId])
+}
+
+// ─── Staff Utility Modules (Part 9) ──────────────────────────────
+// Visibility of each one is gated by its matching TenantFeatureFlag
+// (taxi_directory / phone_directory / price_sheets, from Part 7) — e.g. a
+// business hotel tenant can leave the taxi directory off entirely rather
+// than showing an empty, irrelevant list to their concierges.
+
+model TaxiDriver {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  phone       String
+  vehicleInfo String?
+  notes       String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+model PhoneDirectoryEntry {
+  id         String   @id @default(uuid())
+  tenantId   String
+  name       String
+  phone      String
+  department String?
+  notes      String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+// Freeform quick-reference pricing not tied to a bookable Service (e.g.
+// "Late checkout fee", "Extra towel") — grouped by a free-text category
+// label since these don't need the full Category/FilterGroup machinery.
+model PriceSheetItem {
+  id        String   @id @default(uuid())
+  tenantId  String
+  category  String
+  label     String
+  price     Float?
+  currency  String?  @default("EUR")
+  unit      String?
+  notes     String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
   @@index([tenantId])
 }
