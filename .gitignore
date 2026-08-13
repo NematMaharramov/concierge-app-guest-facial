@@ -4,3 +4,4 @@ dist/
 *.log
 .DS_Store
 backend/uploads/
+next-env.d.ts
