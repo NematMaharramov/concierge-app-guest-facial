@@ -20,9 +20,11 @@ echo "→ Waiting for database to be ready..."
 sleep 8
 
 echo "→ Running migrations..."
-docker compose exec backend npx prisma migrate deploy
+docker compose exec backend npx prisma db push
 
 echo "→ Seeding database (first run only)..."
+docker compose exec backend npx ts-node --project tsconfig.seed.json prisma/backfill-tenant.ts || echo "  (Backfill already run or skipped)"
+docker compose exec backend npx ts-node --project tsconfig.seed.json prisma/seed-category-templates.ts || echo "  (Template seed already run or skipped)"
 docker compose exec backend npx ts-node --project tsconfig.seed.json prisma/seed.ts || echo "  (Seed already run or skipped)"
 
 echo ""

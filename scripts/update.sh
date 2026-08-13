@@ -12,6 +12,6 @@ docker compose up -d --no-deps backend frontend nginx
 
 echo "→ Running any new migrations..."
 sleep 5
-docker compose exec backend npx prisma migrate deploy
+docker compose exec backend npx prisma db push
 
 echo "✅ Update complete!"
