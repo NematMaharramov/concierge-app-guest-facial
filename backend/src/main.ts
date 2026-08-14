@@ -11,9 +11,18 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   app.enableCors({
-    origin: process.env.FRONTEND_URL || '*',
+    // Part 8 introduced per-tenant custom domains — a single fixed
+    // FRONTEND_URL can't cover every tenant's own domain, so the origin
+    // is reflected dynamically instead of pinned to one value. This app
+    // authenticates via a Bearer JWT (not cookies), so there's no
+    // ambient-credential/CSRF exposure from being permissive here.
+    origin: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    // x-tenant-slug / x-tenant-host (Parts 1 & 8) must be explicitly
+    // allowed or the browser's CORS preflight silently blocks every
+    // request that carries them — which is every request, since the
+    // frontend's axios interceptor adds x-tenant-host to all of them.
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-slug', 'x-tenant-host'],
     credentials: true,
   });
 
